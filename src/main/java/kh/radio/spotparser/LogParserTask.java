@@ -1,23 +1,36 @@
 package kh.radio.spotparser;
 
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 import java.util.TimerTask;
+import java.util.prefs.Preferences;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import kh.radio.spotparser.domain.DecodedSpot;
-import kh.radio.spotparser.domain.ReceiveSettings;
-import kh.radio.spotparser.domain.TXInfo;
+import kh.radio.spotcollector.client.generated.Spot;
+import kh.radio.spotcollector.client.generated.SpotCollectorEndpoint;
+import kh.radio.spotcollector.client.generated.SpotCollectorEndpointService;
+import kh.radio.spotparser.domain.ReceivedSpotHeader;
+import kh.radio.spotparser.domain.TXMessage;
 import kh.radio.spotparser.wsjt.LogFileReader;
 import kh.radio.spotparser.wsjt.LogLineType;
 
+import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 
 
 public class LogParserTask extends TimerTask {
 
+	//persisted preferences, eg for time of last log parse
+	private AppPreferences appPrefs;
+	private String lastLogParsedDate;
+	
 	private String filePath;
 	private LogFileReader reader;
+	
+	private static final Logger LOG = LogManager.getLogger("kh.radio.spotparser");
 	
 	//log line type: new date reception starting header
 	//LogLineType.NEW_DAY_HEADER_LINE
@@ -44,28 +57,57 @@ public class LogParserTask extends TimerTask {
 	public LogParserTask(String filePath) throws Exception{
 		this.filePath = filePath;
 		this.reader = new LogFileReader(filePath);
+		this.appPrefs = this.getPreferences();
 	}
 	
 	@Override
 	public void run() {
-		Date now = new Date();
+		LocalDateTime now = LocalDateTime.now();
 		System.out.println("Starting file check at " + now);
+		System.out.println("Last log parsed at " + this.lastLogParsedDate);
+		
+		//TODO: need to only check new lines since last run - need to record timestamp of last spot and update with last when complete
 		
 		//org.apache.commons.io.input.ReversedLinesFileReader
+		
+		//TODO: for now - check all lines... but this needs to be refactored to not do this every time
+		this.parseAllLines();
+		
+		//TODO: persist prefs to file		
+		//this.lastLogParsedDate =
 	}
+	
+	
+	private AppPreferences getPreferences() {
+
+		AppPreferences tempPrefs = new AppPreferences();
+		
+		Preferences prefs = Preferences.userNodeForPackage( getClass() );
+		this.lastLogParsedDate = prefs.get("lastLogParsed", "");
+		
+		//TODO: finish this
+		
+		return tempPrefs;
+		
+	}
+	
 	
 	public void parseAllLines(){
 		int lineCount = 1;
-		ReceiveSettings settings = null;
+		ReceivedSpotHeader settings = null;
+		SpotCollectorEndpointService service = new SpotCollectorEndpointService();
+		SpotCollectorEndpoint endpoint = service.getSpotCollectorEndpointPort();
 		
-		LOGGER.info("readAllLines starting");
+		List<Spot> spots = new ArrayList<>();
+
+		LOGGER.info("parseAllLines starting");
 		String currentLine = this.reader.nextLine();
 		
 		while(currentLine != null){
 			LOGGER.info("line "  + lineCount);
 				
-			DecodedSpot spot = null;
-			TXInfo tx = null;
+			Spot spot = null;
+			TXMessage tx = null;
 			
 			LogLineType type = this.identfyLineType(currentLine);
 			switch(type){
@@ -78,6 +120,11 @@ public class LogParserTask extends TimerTask {
 				case DECODED_SPOT_LINE:
 				{
 					spot = parseDecodedSpot(currentLine);
+					
+					//TODO: store timestamp for last spot parsed
+					
+					//add spot to list ready to be uploaded
+					spots.add(spot);
 					break;
 				}
 				
@@ -98,23 +145,31 @@ public class LogParserTask extends TimerTask {
 			currentLine = this.reader.nextLine();
 		}
 		
+		//send parsed spots to endpoint for storage
+		if(spots!= null && spots.size() > 0){
+			endpoint.storeSpots(spots);
+		}
+		else{
+			LOG.info("No new spot data to send this time period...");
+		}
+		
 	}
 	
-	private TXInfo parseTx(String currentLine) {
+	private TXMessage parseTx(String currentLine) {
 		// TODO Auto-generated method stub
 		return null;
 	}
 
 
-	public ReceiveSettings parseReceiveSettings(String currentLine) {
-		ReceiveSettings receiveHeader = null;
+	public ReceivedSpotHeader parseReceiveSettings(String currentLine) {
+		ReceivedSpotHeader receiveHeader = null;
 		Matcher m = NEW_LINE_HEADER_ALL_FIELDS_PATTERN.matcher(currentLine);
 		if(m.find()){
 			LOGGER.info("parsing header fields");
 			String date = m.group(1);
 			String time = m.group(2);
 			LOGGER.info("... date;[" + date + "] time:[" + time +  "]");
-			receiveHeader = new ReceiveSettings(date, time);
+			receiveHeader = new ReceivedSpotHeader(date, time);
 			
 		}
 		else{
@@ -123,8 +178,8 @@ public class LogParserTask extends TimerTask {
 		return receiveHeader;
 	}
 
-	public DecodedSpot parseDecodedSpot(String currentLine) {
-		DecodedSpot spot = null;
+	public Spot parseDecodedSpot(String currentLine) {
+		Spot spot = null;
 		Matcher m = DECODED_SPOT_ALL_FIELDS_PATTERN.matcher(currentLine);
 		if(m.find()){
 			LOGGER.info("parsing spot fields");
@@ -138,7 +193,7 @@ public class LogParserTask extends TimerTask {
 			String word3 = m.group(7);
 			LOGGER.info("... time:[" + time + "] signal:[" + signalReport +  "] timeDev:[" + timeDeviation 
 					+  "] freqoffset:[" + frequencyOffset +  "] word1:[" + word1 +  "] word2:[" + word2 + "] word3:[" + word3 + "]");
-			spot = new DecodedSpot(time, signalReport, timeDeviation, frequencyOffset, word1, word2, word3);
+			spot = new Spot(time, signalReport, timeDeviation, frequencyOffset, word1, word2, word3);
 			
 		}
 		else{

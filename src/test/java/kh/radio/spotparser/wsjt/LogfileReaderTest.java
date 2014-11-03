@@ -1,9 +1,9 @@
 package kh.radio.spotparser.wsjt;
 
 import junit.framework.TestCase;
+import kh.radio.spotcollector.client.generated.Spot;
 import kh.radio.spotparser.LogParserTask;
-import kh.radio.spotparser.domain.DecodedSpot;
-import kh.radio.spotparser.domain.ReceiveSettings;
+import kh.radio.spotparser.domain.ReceivedSpotHeader;
 
 import org.junit.Test;
 
@@ -42,7 +42,7 @@ public class LogfileReaderTest {
 	@Test
 	public void testHeaderFieldsRegex() throws Exception{
 		LogParserTask task = new LogParserTask();
-		ReceiveSettings header = task.parseReceiveSettings("2014-Jul-07 19:40  14.076 MHz  JT9+JT65");
+		ReceivedSpotHeader header = task.parseReceiveSettings("2014-Jul-07 19:40  14.076 MHz  JT9+JT65");
 		
 		TestCase.assertEquals("19:40", header.getTime());
 		TestCase.assertEquals("2014-Jul-07", header.getDate());
@@ -54,7 +54,7 @@ public class LogfileReaderTest {
 	@Test
 	public void testSpotFieldsRegex_CQ(){
 		LogParserTask task = new LogParserTask();
-		DecodedSpot spot = task.parseDecodedSpot("1950 -21  0.2 1231 # CQ KN8J EM99");
+		Spot spot = task.parseDecodedSpot("1950 -21  0.2 1231 # CQ KN8J EM99");
 		TestCase.assertNotNull(spot);
 		TestCase.assertEquals("1950", spot.getTime());
 		TestCase.assertEquals("-21", spot.getSignalreport());
@@ -71,7 +71,7 @@ public class LogfileReaderTest {
 	@Test
 	public void testSpotFieldsRegex_cqResponse(){
 		LogParserTask task = new LogParserTask();
-		DecodedSpot spot = task.parseDecodedSpot("1959 -16  1.5 1229 # KN8J KC2LM DM65");
+		Spot spot = task.parseDecodedSpot("1959 -16  1.5 1229 # KN8J KC2LM DM65");
 		
 		TestCase.assertNotNull(spot);
 		TestCase.assertEquals("1959", spot.getTime());
@@ -89,7 +89,7 @@ public class LogfileReaderTest {
 	@Test
 	public void testSpotFieldsRegex_signalResponse(){
 		LogParserTask task = new LogParserTask();
-		DecodedSpot spot = task.parseDecodedSpot("1952 -20 -0.2 1231 # W9MDB KN8J -01");
+		Spot spot = task.parseDecodedSpot("1952 -20 -0.2 1231 # W9MDB KN8J -01");
 		
 		TestCase.assertNotNull(spot);
 		TestCase.assertEquals("1952", spot.getTime());
