@@ -1,6 +1,8 @@
 package kh.radio.spotparser;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -25,7 +27,7 @@ public class LogParserTask extends TimerTask {
 
 	//persisted preferences, eg for time of last log parse
 	private AppPreferences appPrefs;
-	private String lastLogParsedDate;
+	private long lastLogParsedMillis;
 	
 	private String filePath;
 	private LogFileReader reader;
@@ -62,9 +64,9 @@ public class LogParserTask extends TimerTask {
 	
 	@Override
 	public void run() {
-		LocalDateTime now = LocalDateTime.now();
-		System.out.println("Starting file check at " + now);
-		System.out.println("Last log parsed at " + this.lastLogParsedDate);
+		LocalDateTime start = LocalDateTime.now(ZoneId.of("Z"));
+		System.out.println("Starting file check at " + start);
+		System.out.println("Last log parsed at " + this.lastLogParsedMillis);
 		
 		//TODO: need to only check new lines since last run - need to record timestamp of last spot and update with last when complete
 		
@@ -73,20 +75,29 @@ public class LogParserTask extends TimerTask {
 		//TODO: for now - check all lines... but this needs to be refactored to not do this every time
 		this.parseAllLines();
 		
-		//TODO: persist prefs to file		
-		//this.lastLogParsedDate =
+		//persist end time prefs to file		
+		LocalDateTime end = LocalDateTime.now(ZoneId.of("Z"));
+		
+		this.lastLogParsedMillis = DateTimeUtils.dateTimeToMillisUTC(end);
+		this.appPrefs.setLastLogProcessedMillisUTC(this.lastLogParsedMillis);
+		this.saveAppPrefs();
 	}
 	
 	
-	private AppPreferences getPreferences() {
+	
+	private void saveAppPrefs() {
+		// TODO Auto-generated method stub
+		
+	}
 
-		AppPreferences tempPrefs = new AppPreferences();
+	private AppPreferences getPreferences() {
 		
 		Preferences prefs = Preferences.userNodeForPackage( getClass() );
-		this.lastLogParsedDate = prefs.get("lastLogParsed", "");
+		this.lastLogParsedMillis = prefs.getLong("lastLogParsed", 0);
 		
 		//TODO: finish this
-		
+		AppPreferences tempPrefs = new AppPreferences();
+		tempPrefs.setLastLogProcessedMillisUTC(this.lastLogParsedMillis);
 		return tempPrefs;
 		
 	}

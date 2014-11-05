@@ -1,17 +1,16 @@
 package kh.radio.spotparser;
 
-import java.util.Date;
 
 public class AppPreferences {
 
-	private Date lastLogProcessed;
+	private long lastLogProcessedMillisUTC;
 
-	public Date getLastLogProcessed() {
-		return lastLogProcessed;
+	public long getLastLogProcessedMillisUTC() {
+		return lastLogProcessedMillisUTC;
 	}
 
-	public void setLastLogProcessed(Date lastLogProcessed) {
-		this.lastLogProcessed = lastLogProcessed;
+	public void setLastLogProcessedMillisUTC(long lastLogProcessed) {
+		this.lastLogProcessedMillisUTC = lastLogProcessed;
 	}
 	
 }
