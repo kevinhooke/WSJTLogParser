@@ -8,8 +8,8 @@ import java.time.format.DateTimeFormatter;
 public class DateTimeUtils {
 
 	private static final DateTimeFormatter formatter =
-            DateTimeFormatter.ofPattern("yyyy-MMM-DD kk:mm").withZone(ZoneId.of("Z"));
-	
+            DateTimeFormatter.ofPattern("yyyy-MMM-dd kkmm").withZone(ZoneId.of("Z"));
+
 	public static long dateTimeToMillisUTC(LocalDateTime dateTime){
 		return dateTime.toEpochSecond(ZoneOffset.UTC);
 	}

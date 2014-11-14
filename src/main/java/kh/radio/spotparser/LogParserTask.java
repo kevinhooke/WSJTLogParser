@@ -2,6 +2,7 @@ package kh.radio.spotparser;
 
 import java.io.File;
 import java.io.IOException;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -36,6 +37,7 @@ public class LogParserTask extends TimerTask {
 	// persisted preferences, eg for time of last log parse
 	private AppPreferences appPrefs;
 	private long lastLogParsedMillis;
+	private LocalDateTime lastLogParsedDateTime;
 
 	private String filePath;
 	private LogFileReader reader;
@@ -76,8 +78,8 @@ public class LogParserTask extends TimerTask {
 	@Override
 	public void run() {
 		LocalDateTime start = LocalDateTime.now(ZoneId.of("Z"));
-		System.out.println("Starting file check at " + start);
-		System.out.println("Last log parsed at " + this.lastLogParsedMillis);
+		System.out.println("Starting file check at: " + start);
+		System.out.println("Last log line parsed: " + this.lastLogParsedDateTime);
 		try {
 			this.parseAllLines();
 			storeLastLogLineProcessedTime();
@@ -92,11 +94,9 @@ public class LogParserTask extends TimerTask {
 	 * Stores last log line processed time to Preferences store
 	 */
 	private void storeLastLogLineProcessedTime() {
-		// persist end time prefs to file
-		LocalDateTime end = LocalDateTime.now(ZoneId.of("Z"));
 
-		this.lastLogParsedMillis = DateTimeUtils.dateTimeToMillisUTC(end);
-		this.appPrefs.setLastLogProcessedMillisUTC(this.lastLogParsedMillis);
+		long millis = DateTimeUtils.dateTimeToMillisUTC(this.lastLogParsedDateTime);
+		this.appPrefs.setLastLogProcessedMillisUTC(millis);
 		try {
 			this.saveAppPrefs();
 		} catch (BackingStoreException e) {
@@ -116,7 +116,7 @@ public class LogParserTask extends TimerTask {
 
 		Preferences prefs = Preferences.userNodeForPackage(getClass());
 		this.lastLogParsedMillis = prefs.getLong(LAST_LOG_PARSED, 0);
-
+		this.lastLogParsedDateTime = LocalDateTime.ofInstant(Instant.ofEpochMilli(this.lastLogParsedMillis), ZoneId.of("Z"));
 		AppPreferences tempPrefs = new AppPreferences();
 		tempPrefs.setLastLogProcessedMillisUTC(this.lastLogParsedMillis);
 		return tempPrefs;
@@ -125,34 +125,37 @@ public class LogParserTask extends TimerTask {
 
 	public void parseAllLines() throws IOException {
 		int lineCount = 1;
-		ReceivedSpotHeader settings = null;
-		SpotCollectorEndpointService service = new SpotCollectorEndpointService();
-		SpotCollectorEndpoint endpoint = service.getSpotCollectorEndpointPort();
-
+		
 		List<Spot> spots = new ArrayList<>();
 
 		LOGGER.info("parseAllLines starting");
 
 		String currentLine = null;
-
+		this.reader.resetToStartOfFile();
+		
 		// if we have already parsed part of this log, we need to skip forward
 		// to find new lines
-		if (this.lastLogParsedMillis > 0) {
+		if (this.lastLogParsedDateTime != null) {
 			currentLine = findNextLineNotYetParsed();
 		} else {
 			// read the fist line and start readin from the start of the file
 			currentLine = this.reader.nextLine();
 
 		}
-
+		
+		LogLineType logLineType = null;
+		ReceivedSpotHeader settings = null;
+		Spot spot = null;
+		
 		while (currentLine != null) {
 			LOGGER.info("line " + lineCount);
 
-			Spot spot = null;
+			
 			TXMessage tx = null;
 
-			LogLineType type = this.identfyLineType(currentLine);
-			switch (type) {
+			logLineType = this.identfyLineType(currentLine);
+			
+			switch (logLineType) {
 			case NEW_DAY_HEADER_LINE: {
 				settings = parseReceiveSettings(currentLine);
 				break;
@@ -183,8 +186,20 @@ public class LogParserTask extends TimerTask {
 			currentLine = this.reader.nextLine();
 		}
 
+		//update last log line processed datetime
+		if(logLineType.equals(LogLineType.NEW_DAY_HEADER_LINE)){
+			//strip ":" from time in new day header line in log
+			this.lastLogParsedDateTime = DateTimeUtils.parseDateAndTime(settings.getDate(), settings.getTime().replace(":",""));
+		}
+		else if(logLineType.equals(LogLineType.DECODED_SPOT_LINE)){
+			this.lastLogParsedDateTime = DateTimeUtils.parseDateAndTime(settings.getDate(), spot.getTime());
+		}
+		
+		
 		// send parsed spots to endpoint for storage
 		if (spots != null && spots.size() > 0) {
+			SpotCollectorEndpointService service = new SpotCollectorEndpointService();
+			SpotCollectorEndpoint endpoint = service.getSpotCollectorEndpointPort();
 			endpoint.storeSpots(spots);
 		} else {
 			LOG.info("No new spot data to send this time period...");
@@ -202,7 +217,6 @@ public class LogParserTask extends TimerTask {
 		Spot spot = null;
 		String currentLine = this.reader.nextLine();
 
-		//TODO: check timestamps if next line had not been parsed, start parsing here
 		//TODO: also need to step forward through spots for the current date that follow the header
 		
 		while (currentLine != null) {
@@ -212,8 +226,10 @@ public class LogParserTask extends TimerTask {
 				if(lineHasNotBeenParsed(settings))
 				{
 					break;
-				}
-				
+				}				
+			}
+			else if(type.equals(LogLineType.DECODED_SPOT_LINE)) {
+				//TODO: check individual spot lines for time too
 			}
 			
 			// read next line
@@ -225,8 +241,14 @@ public class LogParserTask extends TimerTask {
 
 	
 	private boolean lineHasNotBeenParsed(ReceivedSpotHeader settings) {
-		// TODO Auto-generated method stub
-		return false;
+		boolean result = false;
+		LocalDateTime lastLineReadDateTime = DateTimeUtils.parseDateAndTime(settings.getDate(), settings.getTime().replace(":", ""));
+		if(this.lastLogParsedDateTime.isBefore(lastLineReadDateTime)){
+			result = true;
+		}
+		
+		
+		return result;
 	}
 
 	private TXMessage parseTx(String currentLine) {
