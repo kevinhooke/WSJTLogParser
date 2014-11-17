@@ -22,4 +22,14 @@ public class DateTimeUtils {
 		
 		
 	}
+
+	public static LocalDateTime updateTime(LocalDateTime lastLogParsedDateTime,
+			String time) {
+		String hour = time.substring(0, 2);
+		String mins = time.substring(2, 4);
+		int tmpHour = Integer.parseInt(hour);
+		int tmpMins = Integer.parseInt(mins);
+		
+		return lastLogParsedDateTime.withHour(tmpHour).withMinute(tmpMins).withSecond(0);
+	}
 }

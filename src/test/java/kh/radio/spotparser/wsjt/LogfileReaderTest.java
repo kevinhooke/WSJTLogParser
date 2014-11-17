@@ -32,13 +32,7 @@ public class LogfileReaderTest {
 		
 		TestCase.assertEquals(LogLineType.NEW_DAY_HEADER_LINE, type);
 	}
-	
-	@Test
-	public void testReadAllLines() throws Exception{
-		LogParserTask task = new LogParserTask("/Users/kev/develop/AmateurRadioCallsignSpotHistory/CallsignSpotParser/CallsignSpotParser/src/test/resources/ALL.TXT");;
-		task.parseAllLines();
-	}
-	
+		
 	@Test
 	public void testHeaderFieldsRegex() throws Exception{
 		LogParserTask task = new LogParserTask();
