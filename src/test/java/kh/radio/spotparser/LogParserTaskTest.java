@@ -79,6 +79,8 @@ public class LogParserTaskTest {
 		linesProcessed = task.parseAllLines();
 		assertTrue("Expecting only 1 line processed", linesProcessed == 1);
 
+		//TODO: work out how to update the string being parsed by BufferedReader so we can add new lines to it here
+		
 	}
 	
 	

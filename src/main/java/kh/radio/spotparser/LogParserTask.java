@@ -123,7 +123,7 @@ public class LogParserTask extends TimerTask {
 		prefs.flush();
 	}
 
-	public AppPreferences initPreferences() {
+	public void initPreferences() {
 
 		Preferences prefs = Preferences.userNodeForPackage(getClass());
 		long lastLogParsedMillis = prefs.getLong(
@@ -134,11 +134,10 @@ public class LogParserTask extends TimerTask {
 		LOGGER.info("Preferences: lastLogParsedDateTime: "
 				+ lastLogParsedDateTime);
 
-		// TODO: do we still need app prefs? only value using right now is
-		// this.lastLogParsedDateTime
+
 		AppPreferences tempPrefs = new AppPreferences();
 		tempPrefs.setLastLogProcessedMillisUTC(lastLogParsedMillis);
-		return tempPrefs;
+		this.appPrefs = tempPrefs;
 
 	}
 
@@ -212,6 +211,8 @@ public class LogParserTask extends TimerTask {
 			currentLine = this.reader.nextLine();
 		}
 
+		//TODO: on second timed run, logLineType is null if no new lines added
+		
 		// update last log line processed datetime
 		if (logLineType.equals(LogLineType.NEW_DAY_HEADER_LINE)) {
 			// strip ":" from time in new day header line in log
@@ -254,7 +255,7 @@ public class LogParserTask extends TimerTask {
 	 * @throws FileNotFoundException
 	 */
 	private String findNextLineNotYetParsed() throws FileNotFoundException {
-		ReceivedSpotHeader settings = null;
+		ReceivedSpotHeader spotHeaderLineValues = null;
 		Spot spot = null;
 		String currentLine = this.reader.nextLine();
 
@@ -263,13 +264,23 @@ public class LogParserTask extends TimerTask {
 
 		while (currentLine != null) {
 			LogLineType type = this.identfyLineType(currentLine);
+			
+			//check if header line has been parsed yet
 			if (type.equals(LogLineType.NEW_DAY_HEADER_LINE)) {
-				settings = parseReceiveSettings(currentLine);
-				if (lineHasNotBeenParsed(settings)) {
+				spotHeaderLineValues = parseReceiveSettings(currentLine);
+				LocalDateTime currentHeaderDateTime = DateTimeUtils.parseDateAndTime(
+						spotHeaderLineValues.getDate(), spotHeaderLineValues.getTime().replace(":", ""));
+				if (lineHasNotBeenParsed(currentHeaderDateTime)) {
 					break;
 				}
 			} else if (type.equals(LogLineType.DECODED_SPOT_LINE)) {
-				// TODO: check individual spot lines for time too
+				//check if individual spot line has been parsed yet
+				spot = parseDecodedSpot(currentLine);
+				LocalDateTime currentSpotDateTime = DateTimeUtils.parseDateAndTime(
+						spotHeaderLineValues.getDate(), spot.getTime());
+				if (lineHasNotBeenParsed(currentSpotDateTime)) {
+					break;
+				}
 			}
 
 			// read next line
@@ -279,18 +290,17 @@ public class LogParserTask extends TimerTask {
 		return currentLine;
 	}
 
-	private boolean lineHasNotBeenParsed(ReceivedSpotHeader currentHeaderLine) {
+	private boolean lineHasNotBeenParsed(LocalDateTime currentLineDateTime) {
 		boolean result = false;
-		LocalDateTime currentHeaderDateTime = DateTimeUtils.parseDateAndTime(
-				currentHeaderLine.getDate(), currentHeaderLine.getTime().replace(":", ""));
+
 		LOGGER.debug("Checking if line already parsed, last line read marker: "
 				+ this.lastLogParsedDateTime);
-		LOGGER.debug("... comparing with current line: " + currentHeaderDateTime);
+		LOGGER.debug("... comparing with current line: " + currentLineDateTime);
 
-		if (this.lastLogParsedDateTime.isEqual(currentHeaderDateTime)) {
+		if (this.lastLogParsedDateTime.isEqual(currentLineDateTime)) {
 			LOGGER.debug("... skipping this line");
 		} else {
-			if (this.lastLogParsedDateTime.isBefore(currentHeaderDateTime)) {
+			if (this.lastLogParsedDateTime.isBefore(currentLineDateTime)) {
 				LOGGER.debug("...  this line not yet parsed");
 				result = true;
 			} else {
@@ -302,8 +312,9 @@ public class LogParserTask extends TimerTask {
 		return result;
 	}
 
+	
 	private TXMessage parseTx(String currentLine) {
-		// TODO Auto-generated method stub
+		// TODO not sure if we have a purpose to parse our own tx just yet
 		return null;
 	}
 
