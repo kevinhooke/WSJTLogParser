@@ -55,7 +55,7 @@ public class CallsignSpotLogFileParserApp {
 		try {
 			this.timer = new Timer();
 			this.logParserTask = new LogParserTask(
-					"/Users/kev/develop/AmateurRadioCallsignSpotHistory/CallsignSpotParser/CallsignSpotParser/src/test/resources/ALL.TXT");
+					"/Users/kev/develop/AmateurRadioCallsignSpotHistory/CallsignSpotParser/CallsignSpotParser/src/test/resources/ALL_pt1.TXT");
 
 			this.timer.schedule(this.logParserTask, this.getMillisToFirstRun(),
 					60 * 1000);

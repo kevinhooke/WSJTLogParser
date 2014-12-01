@@ -41,9 +41,9 @@ public class LogParserTask extends TimerTask {
 	// persisted preferences, eg for time of last log parse
 	private AppPreferences appPrefs;
 	private LocalDateTime lastLogParsedDateTime;
-
 	private String filePath;
 	private LogFileReader reader;
+	private ReceivedSpotHeader spotHeader = null;
 	private String lastLogParsedPreferencesKey = LAST_LOG_PARSED;
 
 	// log line type: new date reception starting header
@@ -163,13 +163,12 @@ public class LogParserTask extends TimerTask {
 		if (this.lastLogParsedDateTime != null) {
 			currentLine = findNextLineNotYetParsed();
 		} else {
-			// read the fist line and start readin from the start of the file
+			// read the fist line and start reading from the start of the file
 			currentLine = this.reader.nextLine();
 
 		}
 
 		LogLineType logLineType = null;
-		ReceivedSpotHeader settings = null;
 		Spot spot = null;
 
 		while (currentLine != null) {
@@ -181,7 +180,7 @@ public class LogParserTask extends TimerTask {
 
 			switch (logLineType) {
 			case NEW_DAY_HEADER_LINE: {
-				settings = parseReceiveSettings(currentLine);
+				this.spotHeader = parseReceiveSettings(currentLine);
 				break;
 			}
 
@@ -212,26 +211,31 @@ public class LogParserTask extends TimerTask {
 		}
 
 		//TODO: on second timed run, logLineType is null if no new lines added
-		
-		// update last log line processed datetime
-		if (logLineType.equals(LogLineType.NEW_DAY_HEADER_LINE)) {
-			// strip ":" from time in new day header line in log
-			this.lastLogParsedDateTime = DateTimeUtils.parseDateAndTime(
-					settings.getDate(), settings.getTime().replace(":", ""));
-		} else if (logLineType.equals(LogLineType.DECODED_SPOT_LINE)) {
-			this.lastLogParsedDateTime = DateTimeUtils.parseDateAndTime(
-					settings.getDate(), spot.getTime());
+		if(logLineType != null){
+			// update last log line processed datetime
+			if (logLineType.equals(LogLineType.NEW_DAY_HEADER_LINE)) {
+				// strip ":" from time in new day header line in log
+				this.lastLogParsedDateTime = DateTimeUtils.parseDateAndTime(
+						this.spotHeader.getDate(), this.spotHeader.getTime().replace(":", ""));
+			} else if (logLineType.equals(LogLineType.DECODED_SPOT_LINE)) {
+				this.lastLogParsedDateTime = DateTimeUtils.parseDateAndTime(
+						this.spotHeader.getDate(), spot.getTime());
+			}
+	
+			// send parsed spots to endpoint for storage
+			if (spots != null && spots.size() > 0) {
+				SpotCollectorEndpointService service = new SpotCollectorEndpointService();
+				SpotCollectorEndpoint endpoint = service
+						.getSpotCollectorEndpointPort();
+				endpoint.storeSpots(spots);
+			} else {
+				LOGGER.info("No new spot data to send this time period...");
+			}
 		}
-
-		// send parsed spots to endpoint for storage
-		if (spots != null && spots.size() > 0) {
-			SpotCollectorEndpointService service = new SpotCollectorEndpointService();
-			SpotCollectorEndpoint endpoint = service
-					.getSpotCollectorEndpointPort();
-			endpoint.storeSpots(spots);
-		} else {
-			LOGGER.info("No new spot data to send this time period...");
+		else{
+			LOGGER.info("No new spot data detected in log since last read, sleeping until next check");
 		}
+			
 		return spots.size();
 	}
 
@@ -255,29 +259,32 @@ public class LogParserTask extends TimerTask {
 	 * @throws FileNotFoundException
 	 */
 	private String findNextLineNotYetParsed() throws FileNotFoundException {
-		ReceivedSpotHeader spotHeaderLineValues = null;
 		Spot spot = null;
 		String currentLine = this.reader.nextLine();
 
-		// TODO: also need to step forward through spots for the current date
+		//TODO: also need to step forward through spots for the current date
 		// that follow the header
+		//TODO: check if this is done?
 
 		while (currentLine != null) {
 			LogLineType type = this.identfyLineType(currentLine);
 			
 			//check if header line has been parsed yet
 			if (type.equals(LogLineType.NEW_DAY_HEADER_LINE)) {
-				spotHeaderLineValues = parseReceiveSettings(currentLine);
+				this.spotHeader = parseReceiveSettings(currentLine);
 				LocalDateTime currentHeaderDateTime = DateTimeUtils.parseDateAndTime(
-						spotHeaderLineValues.getDate(), spotHeaderLineValues.getTime().replace(":", ""));
+						this.spotHeader.getDate(), this.spotHeader.getTime().replace(":", ""));
 				if (lineHasNotBeenParsed(currentHeaderDateTime)) {
 					break;
 				}
 			} else if (type.equals(LogLineType.DECODED_SPOT_LINE)) {
 				//check if individual spot line has been parsed yet
 				spot = parseDecodedSpot(currentLine);
+				
+				//TODO: if spot on same day is added, when read, the header line is null?
+				
 				LocalDateTime currentSpotDateTime = DateTimeUtils.parseDateAndTime(
-						spotHeaderLineValues.getDate(), spot.getTime());
+						this.spotHeader.getDate(), spot.getTime());
 				if (lineHasNotBeenParsed(currentSpotDateTime)) {
 					break;
 				}
@@ -366,20 +373,20 @@ public class LogParserTask extends TimerTask {
 		Matcher headerMatcher = NEW_LINE_HEADER_PATTERN.matcher(line);
 		if (headerMatcher.find()) {
 			type = LogLineType.NEW_DAY_HEADER_LINE;
-			LOGGER.info("log file read: header line");
+			LOGGER.info("log file line read, type: header line");
 		} else {
 			Matcher rxMatcher = DECODED_SPOT_PATTERN.matcher(line);
 			if (rxMatcher.find()) {
 				type = LogLineType.DECODED_SPOT_LINE;
-				LOGGER.info("log file read: rx spot line");
+				LOGGER.info("log file line read, type: rx spot line");
 			} else {
 				Matcher txMatcher = TX_PATTERN.matcher(line);
 				if (txMatcher.find()) {
 					type = LogLineType.TX_LINE;
-					LOGGER.info("log file read: tx line");
+					LOGGER.info("log file line read, type: tx line");
 				} else {
 					type = LogLineType.UNKNOWN_LINE;
-					LOGGER.info("log file read: unknown");
+					LOGGER.error("log file line read, type:  unknown line type");
 				}
 			}
 

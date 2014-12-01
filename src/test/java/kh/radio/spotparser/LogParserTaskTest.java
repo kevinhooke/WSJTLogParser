@@ -1,8 +1,10 @@
 package kh.radio.spotparser;
 
-import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.StringReader;
 
@@ -31,6 +33,13 @@ public class LogParserTaskTest {
 		return task;
 	}
 
+	private LogParserTask createTestTaskWithFile(String pathToFile) throws Exception{
+		LogParserTask task = new LogParserTask(pathToFile);
+		task.setLastLogParsedPreferencesKey(LogParserTask.LAST_LOG_PARSED_TEST);
+		task.initPreferences();
+		return task;
+	}
+	
 	@Test
 	public void testParseOneLine() throws IOException {
 
@@ -60,27 +69,32 @@ public class LogParserTaskTest {
 	}
 
 	@Test
-	public void testParse2LinesAdd1Line() throws IOException {
+	public void testParse2LinesAdd1Line() throws Exception {
 
 		StringBuilder sb = new StringBuilder();
 		sb.append(HEADER_set1_1);
 		sb.append(LINE_set1_2);
 		sb.append(LINE_set1_3);
 		
+		File testFile = File.createTempFile("LogParserTaskTest", "_testFile");
 
-		LogParserTask task = this.createTestTask(sb.toString());
+		BufferedWriter writer = new BufferedWriter(new FileWriter(testFile));
+		writer.append(sb.toString());
+		writer.flush();
+		System.out.println("temp file: " + testFile.getAbsolutePath());
+		LogParserTask task = this.createTestTaskWithFile(testFile.getAbsolutePath());
 		
+		//TODO: need need to mock out the endpoint so parsed lines are not actually sent to endpoint
 		int linesProcessed = task.parseAllLines();
 		assertTrue("Expecting 2 line processed", linesProcessed == 2);
 		
-		sb.append(LINE_set1_4);
-		task = this.createTestTask(sb.toString());
-		
+		//write additional line to file
+		writer.append(LINE_set1_4);
+		writer.flush();
+				
 		linesProcessed = task.parseAllLines();
-		assertTrue("Expecting only 1 line processed", linesProcessed == 1);
-
-		//TODO: work out how to update the string being parsed by BufferedReader so we can add new lines to it here
 		
+		assertTrue("Expecting only 1 newly added line processed", linesProcessed == 1);
 	}
 	
 	
