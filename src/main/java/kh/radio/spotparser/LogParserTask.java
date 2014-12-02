@@ -77,11 +77,15 @@ public class LogParserTask extends TimerTask {
 		this.initPreferences();
 	}
 
+	/**
+	 * TimerTask run() method: checks for and parses any new lines added since
+	 * the last time we read the log file.
+	 */
 	@Override
 	public void run() {
 		LocalDateTime start = LocalDateTime.now(ZoneId.of("Z"));
 		LOGGER.info("Starting file check at: " + start);
-		LOGGER.info("Last log line parsed: " + this.lastLogParsedDateTime);
+		LOGGER.info("... last log line parsed: " + this.lastLogParsedDateTime);
 		try {
 			this.parseAllLines();
 			storeLastLogLineProcessedTime();
@@ -210,7 +214,6 @@ public class LogParserTask extends TimerTask {
 			currentLine = this.reader.nextLine();
 		}
 
-		//TODO: on second timed run, logLineType is null if no new lines added
 		if(logLineType != null){
 			// update last log line processed datetime
 			if (logLineType.equals(LogLineType.NEW_DAY_HEADER_LINE)) {
@@ -245,7 +248,6 @@ public class LogParserTask extends TimerTask {
 	 * 
 	 * @param time
 	 */
-
 	private void updateLastLogLineParsedTime(String time) {
 		this.lastLogParsedDateTime = DateTimeUtils.updateTime(
 				this.lastLogParsedDateTime, time);
@@ -262,9 +264,6 @@ public class LogParserTask extends TimerTask {
 		Spot spot = null;
 		String currentLine = this.reader.nextLine();
 
-		//TODO: also need to step forward through spots for the current date
-		// that follow the header
-		//TODO: check if this is done?
 
 		while (currentLine != null) {
 			LogLineType type = this.identfyLineType(currentLine);
@@ -280,8 +279,6 @@ public class LogParserTask extends TimerTask {
 			} else if (type.equals(LogLineType.DECODED_SPOT_LINE)) {
 				//check if individual spot line has been parsed yet
 				spot = parseDecodedSpot(currentLine);
-				
-				//TODO: if spot on same day is added, when read, the header line is null?
 				
 				LocalDateTime currentSpotDateTime = DateTimeUtils.parseDateAndTime(
 						this.spotHeader.getDate(), spot.getTime());
@@ -329,10 +326,10 @@ public class LogParserTask extends TimerTask {
 		ReceivedSpotHeader receiveHeader = null;
 		Matcher m = NEW_LINE_HEADER_ALL_FIELDS_PATTERN.matcher(currentLine);
 		if (m.find()) {
-			LOGGER.info("parsing header fields");
+			LOGGER.debug("...parsing header fields");
 			String date = m.group(1);
 			String time = m.group(2);
-			LOGGER.info("... date;[" + date + "] time:[" + time + "]");
+			LOGGER.debug("... date;[" + date + "] time:[" + time + "]");
 			receiveHeader = new ReceivedSpotHeader(date, time);
 
 		} else {
@@ -345,7 +342,7 @@ public class LogParserTask extends TimerTask {
 		Spot spot = null;
 		Matcher m = DECODED_SPOT_ALL_FIELDS_PATTERN.matcher(currentLine);
 		if (m.find()) {
-			LOGGER.info("parsing spot fields");
+			LOGGER.info("...parsing spot fields");
 			// 1950 -21 0.2 1231 # CQ KN8J EM99
 			String time = m.group(1);
 			String signalReport = m.group(2);
