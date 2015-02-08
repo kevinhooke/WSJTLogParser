@@ -19,6 +19,7 @@ public class CallsignSpotLogFileParserApp {
 
 	private Timer timer;
 	private LogParserTask logParserTask;
+	private boolean localEndpoint;
 
 	public static void main(String[] args) {
 
@@ -36,6 +37,11 @@ public class CallsignSpotLogFileParserApp {
 		 			System.out.println(".. done, app is reset");
 					System.exit(0);
 				}
+				
+				if(args[0].equals("localtest")){
+					this.localEndpoint = true;
+				}
+				
 			}
 		}
 		
@@ -55,7 +61,8 @@ public class CallsignSpotLogFileParserApp {
 		try {
 			this.timer = new Timer();
 			this.logParserTask = new LogParserTask(
-					"/Users/kev/develop/AmateurRadioCallsignSpotHistory/CallsignSpotParser/CallsignSpotParser/src/test/resources/ALL_pt1.TXT");
+					"/Users/kev/develop/AmateurRadioCallsignSpotHistory/CallsignSpotParser/CallsignSpotParser/src/test/resources/ALL_pt1.TXT",
+					this.localEndpoint);
 
 			this.timer.schedule(this.logParserTask, this.getMillisToFirstRun(),
 					60 * 1000);

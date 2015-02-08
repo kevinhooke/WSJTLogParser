@@ -7,6 +7,7 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.StringReader;
+import java.time.LocalDateTime;
 
 import kh.radio.spotparser.wsjt.LogFileReader;
 
@@ -25,8 +26,6 @@ public class LogParserTaskTest {
 		task.setLastLogParsedPreferencesKey(LogParserTask.LAST_LOG_PARSED_TEST);
 		task.initPreferences();
 				
-
-		
 		LogFileReader reader = new LogFileReader();
 		reader.setReader(new StringReader(lines));
 		task.setReader(reader);
@@ -34,11 +33,40 @@ public class LogParserTaskTest {
 	}
 
 	private LogParserTask createTestTaskWithFile(String pathToFile) throws Exception{
-		LogParserTask task = new LogParserTask(pathToFile);
+		LogParserTask task = new LogParserTask(pathToFile, true);
 		task.setLastLogParsedPreferencesKey(LogParserTask.LAST_LOG_PARSED_TEST);
 		task.initPreferences();
 		return task;
 	}
+	
+	
+	@Test
+	public void testLastLogParsed(){
+		LogParserTask task = new LogParserTask();
+		
+		//read curent last log parsed
+		task.setLastLogParsedPreferencesKey(LogParserTask.LAST_LOG_PARSED_TEST);
+		task.initPreferences();
+		
+		//read after init
+		LocalDateTime dateTime = task.getLastLogParsedDateTime();
+		System.out.println("read time from prefs: " + dateTime);
+		
+		//reset to now and persist
+		LocalDateTime newDateTime = LocalDateTime.now();
+		task.setLastLogParsedDateTime(newDateTime);
+		task.storeLastLogLineProcessedTime();
+		
+		//re-read and check
+		task.initPreferences();
+		LocalDateTime dateTimeReRead = task.getLastLogParsedDateTime();
+		System.out.println("re-read time from prefs: " + dateTimeReRead);
+		System.out.println("original: " + dateTime);
+		assertTrue(dateTimeReRead.compareTo(newDateTime) == 0);
+		
+		
+	}
+	
 	
 	@Test
 	public void testParseOneLine() throws IOException {

@@ -11,7 +11,8 @@ public class DateTimeUtils {
             DateTimeFormatter.ofPattern("yyyy-MMM-dd kkmm").withZone(ZoneId.of("Z"));
 
 	public static long dateTimeToMillisUTC(LocalDateTime dateTime){
-		return dateTime.toEpochSecond(ZoneOffset.UTC);
+		return dateTime.toInstant(ZoneOffset.UTC).toEpochMilli();
+		//return dateTime.toEpochSecond(ZoneOffset.UTC);
 	}
 	
 	public static LocalDateTime parseDateAndTime(String date, String time){

@@ -2,6 +2,7 @@ package kh.radio.spotparser;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.net.URL;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -12,6 +13,9 @@ import java.util.prefs.BackingStoreException;
 import java.util.prefs.Preferences;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import javax.xml.namespace.QName;
+import javax.xml.ws.BindingProvider;
 
 import kh.radio.spotcollector.client.generated.Spot;
 import kh.radio.spotcollector.client.generated.SpotCollectorEndpoint;
@@ -34,12 +38,14 @@ public class LogParserTask extends TimerTask {
 	private static final String LAST_LOG_PARSED = "lastLogParsed";
 
 	/**
-	 * key for lastLogParsed in Preferences for JUnit support
+	 * Preference key for lastLogParsed - used for JUnit support so we don't overwrite
+	 * an actual runtime value stored in preferences
 	 */
 	static final String LAST_LOG_PARSED_TEST = "lastLogParsedTest";
 
 	// persisted preferences, eg for time of last log parse
 	private AppPreferences appPrefs;
+	private boolean localTestMode;
 	private LocalDateTime lastLogParsedDateTime;
 	private String filePath;
 	private LogFileReader reader;
@@ -71,10 +77,14 @@ public class LogParserTask extends TimerTask {
 	public LogParserTask() {
 	}
 
-	public LogParserTask(String filePath) throws Exception {
+	public LogParserTask(String filePath, boolean localTestMode)
+			throws Exception {
 		this.filePath = filePath;
 		this.reader = new LogFileReader(filePath);
+		this.localTestMode = localTestMode;
 		this.initPreferences();
+
+		// TODO: need to load endpoint properties from property file here
 	}
 
 	/**
@@ -98,7 +108,7 @@ public class LogParserTask extends TimerTask {
 	/**
 	 * Stores last log line processed time to Preferences store
 	 */
-	private void storeLastLogLineProcessedTime() {
+	void storeLastLogLineProcessedTime() {
 
 		LOGGER.info("Saving lastLogParsedDateTime to preferences:"
 				+ this.lastLogParsedDateTime);
@@ -138,7 +148,6 @@ public class LogParserTask extends TimerTask {
 		LOGGER.info("Preferences: lastLogParsedDateTime: "
 				+ lastLogParsedDateTime);
 
-
 		AppPreferences tempPrefs = new AppPreferences();
 		tempPrefs.setLastLogProcessedMillisUTC(lastLogParsedMillis);
 		this.appPrefs = tempPrefs;
@@ -146,10 +155,11 @@ public class LogParserTask extends TimerTask {
 	}
 
 	/**
-	 * Parses log file lines. Checks to find last line not already parsed 
-	 * and starts processin from that point.
+	 * Parses log file lines. Checks to find last line not already parsed and
+	 * starts processin from that point.
 	 * 
-	 * @return number of lines actually parsed (new lines, excludes lines previously parsed)
+	 * @return number of lines actually parsed (new lines, excludes lines
+	 *         previously parsed)
 	 * @throws IOException
 	 */
 	public int parseAllLines() throws IOException {
@@ -214,31 +224,55 @@ public class LogParserTask extends TimerTask {
 			currentLine = this.reader.nextLine();
 		}
 
-		if(logLineType != null){
+		if (logLineType != null) {
 			// update last log line processed datetime
 			if (logLineType.equals(LogLineType.NEW_DAY_HEADER_LINE)) {
 				// strip ":" from time in new day header line in log
 				this.lastLogParsedDateTime = DateTimeUtils.parseDateAndTime(
-						this.spotHeader.getDate(), this.spotHeader.getTime().replace(":", ""));
+						this.spotHeader.getDate(), this.spotHeader.getTime()
+								.replace(":", ""));
 			} else if (logLineType.equals(LogLineType.DECODED_SPOT_LINE)) {
 				this.lastLogParsedDateTime = DateTimeUtils.parseDateAndTime(
 						this.spotHeader.getDate(), spot.getTime());
 			}
-	
+
 			// send parsed spots to endpoint for storage
 			if (spots != null && spots.size() > 0) {
-				SpotCollectorEndpointService service = new SpotCollectorEndpointService();
-				SpotCollectorEndpoint endpoint = service
-						.getSpotCollectorEndpointPort();
+				SpotCollectorEndpoint endpoint = null;
+
+				if (this.localTestMode) {
+					SpotCollectorEndpointService service = new SpotCollectorEndpointService(new URL(
+							"http://localhost:8080/SpotCollectorEndpoint?wsdl"),
+					new QName(
+							"http://endpoint.spotcollector.callsign.kh/",
+							"SpotCollectorEndpointService"));
+					endpoint = service.getSpotCollectorEndpointPort();
+
+				} else {
+					//TODO: change this to be property driven
+					SpotCollectorEndpointService service = new SpotCollectorEndpointService(
+							new URL(
+									"http://callsignviz2-kjh.rhcloud.com/SpotCollectorEndpoint?wsdl"),
+							new QName(
+									"http://endpoint.spotcollector.callsign.kh/",
+									"SpotCollectorEndpointService"));
+					endpoint = service.getSpotCollectorEndpointPort();
+
+					BindingProvider bindingProvider = (BindingProvider) endpoint;
+					bindingProvider
+							.getRequestContext()
+							.put(BindingProvider.ENDPOINT_ADDRESS_PROPERTY,
+									"http://callsignviz2-kjh.rhcloud.com/SpotCollectorEndpoint");
+				}
+				
 				endpoint.storeSpots(spots);
 			} else {
 				LOGGER.info("No new spot data to send this time period...");
 			}
-		}
-		else{
+		} else {
 			LOGGER.info("No new spot data detected in log since last read, sleeping until next check");
 		}
-			
+
 		return spots.size();
 	}
 
@@ -264,24 +298,25 @@ public class LogParserTask extends TimerTask {
 		Spot spot = null;
 		String currentLine = this.reader.nextLine();
 
-
 		while (currentLine != null) {
 			LogLineType type = this.identfyLineType(currentLine);
-			
-			//check if header line has been parsed yet
+
+			// check if header line has been parsed yet
 			if (type.equals(LogLineType.NEW_DAY_HEADER_LINE)) {
 				this.spotHeader = parseReceiveSettings(currentLine);
-				LocalDateTime currentHeaderDateTime = DateTimeUtils.parseDateAndTime(
-						this.spotHeader.getDate(), this.spotHeader.getTime().replace(":", ""));
+				LocalDateTime currentHeaderDateTime = DateTimeUtils
+						.parseDateAndTime(this.spotHeader.getDate(),
+								this.spotHeader.getTime().replace(":", ""));
 				if (lineHasNotBeenParsed(currentHeaderDateTime)) {
 					break;
 				}
 			} else if (type.equals(LogLineType.DECODED_SPOT_LINE)) {
-				//check if individual spot line has been parsed yet
+				// check if individual spot line has been parsed yet
 				spot = parseDecodedSpot(currentLine);
-				
-				LocalDateTime currentSpotDateTime = DateTimeUtils.parseDateAndTime(
-						this.spotHeader.getDate(), spot.getTime());
+
+				LocalDateTime currentSpotDateTime = DateTimeUtils
+						.parseDateAndTime(this.spotHeader.getDate(),
+								spot.getTime());
 				if (lineHasNotBeenParsed(currentSpotDateTime)) {
 					break;
 				}
@@ -316,7 +351,6 @@ public class LogParserTask extends TimerTask {
 		return result;
 	}
 
-	
 	private TXMessage parseTx(String currentLine) {
 		// TODO not sure if we have a purpose to parse our own tx just yet
 		return null;
@@ -406,6 +440,14 @@ public class LogParserTask extends TimerTask {
 
 	public void setReader(LogFileReader reader) {
 		this.reader = reader;
+	}
+
+	public LocalDateTime getLastLogParsedDateTime() {
+		return lastLogParsedDateTime;
+	}
+
+	void setLastLogParsedDateTime(LocalDateTime dateTime) {
+		this.lastLogParsedDateTime = dateTime;
 	}
 
 }

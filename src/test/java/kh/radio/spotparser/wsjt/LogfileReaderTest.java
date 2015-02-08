@@ -27,7 +27,8 @@ public class LogfileReaderTest {
 		this.reader = new LogFileReader("/Users/kev/develop/AmateurRadioCallsignSpotHistory/CallsignSpotParser/CallsignSpotParser/src/test/resources/ALL.TXT");
 		
 		String line = this.reader.nextLine();
-		LogParserTask task = new LogParserTask("/Users/kev/develop/AmateurRadioCallsignSpotHistory/CallsignSpotParser/CallsignSpotParser/src/test/resources/ALL.TXT");
+		LogParserTask task = new LogParserTask("/Users/kev/develop/AmateurRadioCallsignSpotHistory/CallsignSpotParser/CallsignSpotParser/src/test/resources/ALL.TXT",
+				true);
 		LogLineType type = task.identfyLineType(line);
 		
 		TestCase.assertEquals(LogLineType.NEW_DAY_HEADER_LINE, type);
