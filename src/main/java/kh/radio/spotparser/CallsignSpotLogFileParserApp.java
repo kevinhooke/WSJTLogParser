@@ -3,7 +3,8 @@ package kh.radio.spotparser;
 import java.util.Calendar;
 import java.util.Timer;
 import java.util.prefs.BackingStoreException;
-import java.util.prefs.Preferences;
+
+import com.beust.jcommander.JCommander;
 
 /**
  * Standalone log parser app. Runs on a timer to run at 10 seconds past each
@@ -24,25 +25,33 @@ public class CallsignSpotLogFileParserApp {
 	public static void main(String[] args) {
 
 		CallsignSpotLogFileParserApp parser = new CallsignSpotLogFileParserApp();
-		parser.handleArgs(args);
-		parser.init();
+		SpotParserArguments appArgs = new SpotParserArguments();
+		JCommander jc = new JCommander(appArgs, args);
+		jc.setProgramName(CallsignSpotLogFileParserApp.class.getName());
+		if (args.length == 0) {
+			jc.usage();
+			System.exit(0);
+		} else {
+			parser.initWithArgs(appArgs);
+			parser.runParserTask();
+		}
 	}
 
-	private void handleArgs(String[] args) {
-		if(args != null){
-			if(args.length > 0) {
-				if(args[0].equals("resetlog")){
-					System.out.println("Clearing last log line parsed ... resetting to initial state ...");
-		 			this.resetLastLogParsed();
-		 			System.out.println(".. done, app is reset");
-					System.exit(0);
-				}
-				
-				if(args[0].equals("localtest")){
-					this.localEndpoint = true;
-				}
-				
-			}
+	private void initWithArgs(SpotParserArguments appArgs) {
+		if (appArgs.isResetLog()) {
+			System.out.println("Clearing last log line parsed ... resetting to initial state ...");
+			this.resetLastLogParsed();
+			System.out.println(".. done, app is reset");
+			System.exit(0);
+		}
+
+		if (appArgs.isLocalMode()) {
+			this.localEndpoint = true;
+		}
+
+		if (appArgs.getSpotterCallsign() == null){
+			System.out.println("Required parameter: Must specify --mycall paramter for callsign of operator receiving this log file.");
+			System.exit(0);
 		}
 		
 	}
@@ -56,7 +65,7 @@ public class CallsignSpotLogFileParserApp {
 
 	}
 
-	private void init() {
+	private void runParserTask() {
 
 		try {
 			this.timer = new Timer();
@@ -64,8 +73,7 @@ public class CallsignSpotLogFileParserApp {
 					"/Users/kev/develop/AmateurRadioCallsignSpotHistory/CallsignSpotParser/CallsignSpotParser/src/test/resources/ALL_pt1.TXT",
 					this.localEndpoint);
 
-			this.timer.schedule(this.logParserTask, this.getMillisToFirstRun(),
-					60 * 1000);
+			this.timer.schedule(this.logParserTask, this.getMillisToFirstRun(), 60 * 1000);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
