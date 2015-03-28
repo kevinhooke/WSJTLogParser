@@ -21,7 +21,7 @@ import org.junit.Test;
 public class SpotCollectorWSClientTest {
 
 	@Test
-	public void testCallSpotStoreEndpoint() {
+	public void testCallSpotStoreEndpoint() throws Exception {
 		SpotCollectorEndpointService service = new SpotCollectorEndpointService();
 		SpotCollectorEndpoint endpoint = service.getSpotCollectorEndpointPort();
 
@@ -32,7 +32,7 @@ public class SpotCollectorWSClientTest {
 
 	@Test
 	public void testCallSpotStoreEndpointOpenShift_noWsdlUrl()
-			throws MalformedURLException {
+			throws Exception {
 
 		try {
 			SpotCollectorEndpointService service = new SpotCollectorEndpointService();
@@ -62,7 +62,7 @@ public class SpotCollectorWSClientTest {
 
 	@Test
 	public void testCallSpotStoreEndpointOpenShift_withWsdlUrl()
-			throws MalformedURLException {
+			throws Exception {
 		SpotCollectorEndpointService service = new SpotCollectorEndpointService(
 				new URL(
 						"http://callsignviz2-kjh.rhcloud.com/SpotCollectorEndpoint?wsdl"),

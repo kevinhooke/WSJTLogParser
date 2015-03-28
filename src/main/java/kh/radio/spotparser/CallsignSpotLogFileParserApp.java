@@ -33,7 +33,7 @@ public class CallsignSpotLogFileParserApp {
 			System.exit(0);
 		} else {
 			parser.initWithArgs(appArgs);
-			parser.runParserTask();
+			parser.runParserTask(appArgs);
 		}
 	}
 
@@ -65,13 +65,13 @@ public class CallsignSpotLogFileParserApp {
 
 	}
 
-	private void runParserTask() {
+	private void runParserTask(SpotParserArguments appArgs) {
 
 		try {
 			this.timer = new Timer();
 			this.logParserTask = new LogParserTask(
 					"/Users/kev/develop/AmateurRadioCallsignSpotHistory/CallsignSpotParser/CallsignSpotParser/src/test/resources/ALL_pt1.TXT",
-					this.localEndpoint);
+					this.localEndpoint, appArgs.getSpotterCallsign());
 
 			this.timer.schedule(this.logParserTask, this.getMillisToFirstRun(), 60 * 1000);
 		} catch (Exception e) {

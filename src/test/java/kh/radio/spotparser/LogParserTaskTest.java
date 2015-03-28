@@ -33,7 +33,7 @@ public class LogParserTaskTest {
 	}
 
 	private LogParserTask createTestTaskWithFile(String pathToFile) throws Exception{
-		LogParserTask task = new LogParserTask(pathToFile, true);
+		LogParserTask task = new LogParserTask(pathToFile, true, "test");
 		task.setLastLogParsedPreferencesKey(LogParserTask.LAST_LOG_PARSED_TEST);
 		task.initPreferences();
 		return task;

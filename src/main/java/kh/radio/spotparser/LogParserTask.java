@@ -14,9 +14,11 @@ import java.util.prefs.Preferences;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import javax.xml.datatype.DatatypeConfigurationException;
 import javax.xml.namespace.QName;
 import javax.xml.ws.BindingProvider;
 
+import kh.radio.spotcollector.client.generated.JMSException_Exception;
 import kh.radio.spotcollector.client.generated.Spot;
 import kh.radio.spotcollector.client.generated.SpotCollectorEndpoint;
 import kh.radio.spotcollector.client.generated.SpotCollectorEndpointService;
@@ -51,6 +53,7 @@ public class LogParserTask extends TimerTask {
 	private LogFileReader reader;
 	private ReceivedSpotHeader spotHeader = null;
 	private String lastLogParsedPreferencesKey = LAST_LOG_PARSED;
+	private String spotterCallsign;
 
 	// log line type: new date reception starting header
 	// LogLineType.NEW_DAY_HEADER_LINE
@@ -58,7 +61,7 @@ public class LogParserTask extends TimerTask {
 			.compile("\\d{4}-\\w{3}-\\d{2}");
 	// 2014-Jul-07 19:40 14.076 MHz JT9+JT65
 	private static final Pattern NEW_LINE_HEADER_ALL_FIELDS_PATTERN = Pattern
-			.compile("(\\d{4}-\\w{3}-\\d{2})\\s+(\\d+:\\d+)\\s+(\\d+\\.\\d+\\s+)MHz");
+			.compile("(\\d{4}-\\w{3}-\\d{2})\\s+(\\d+:\\d+)\\s+(\\d+\\.\\d+)\\s+MHz");
 
 	// log line type: decoded spot
 	// LogLineType.DECODED_SPOT_LINE
@@ -77,11 +80,12 @@ public class LogParserTask extends TimerTask {
 	public LogParserTask() {
 	}
 
-	public LogParserTask(String filePath, boolean localTestMode)
+	public LogParserTask(String filePath, boolean localTestMode, String spotterCallsign)
 			throws Exception {
 		this.filePath = filePath;
 		this.reader = new LogFileReader(filePath);
 		this.localTestMode = localTestMode;
+		this.spotterCallsign = spotterCallsign;
 		this.initPreferences();
 
 		// TODO: need to load endpoint properties from property file here
@@ -200,12 +204,25 @@ public class LogParserTask extends TimerTask {
 
 			case DECODED_SPOT_LINE: {
 				spot = parseDecodedSpot(currentLine);
+				
+				spot.setRxFrequency(this.spotHeader.getRxFrequency());
+				try {
+					spot.setSpotReceivedTimestamp(
+							DateTimeUtils.createXMLGregorianFromLocalDateTime(
+									this.spotHeader.getDate(),
+									spot.getTime()));
 
+					spot.setSpotter(this.getSpotterCallsign());
+					// add spot to list ready to be uploaded
+					spots.add(spot);
+
+				} catch (DatatypeConfigurationException e) {
+					LOGGER.fatal("Failed to parse spot date and time to create Spot!", e);
+				}
+				
 				// update timestamp for last spot parsed
 				this.updateLastLogLineParsedTime(spot.getTime());
 
-				// add spot to list ready to be uploaded
-				spots.add(spot);
 				break;
 			}
 
@@ -264,8 +281,13 @@ public class LogParserTask extends TimerTask {
 							.put(BindingProvider.ENDPOINT_ADDRESS_PROPERTY,
 									"http://callsignviz2-kjh.rhcloud.com/SpotCollectorEndpoint");
 				}
-				
-				endpoint.storeSpots(spots);
+				try{
+					endpoint.storeSpots(spots);
+				}
+				catch(JMSException_Exception e){
+					LOGGER.error("Failed to send spot data to endpoint!", e);
+					
+				}
 			} else {
 				LOGGER.info("No new spot data to send this time period...");
 			}
@@ -363,8 +385,9 @@ public class LogParserTask extends TimerTask {
 			LOGGER.debug("...parsing header fields");
 			String date = m.group(1);
 			String time = m.group(2);
-			LOGGER.debug("... date;[" + date + "] time:[" + time + "]");
-			receiveHeader = new ReceivedSpotHeader(date, time);
+			String freq = m.group(3);
+			LOGGER.debug("... date:[" + date + "] time:[" + time + "]" + " rxFreq:[" + freq + "]");
+			receiveHeader = new ReceivedSpotHeader(date, time, freq);
 
 		} else {
 			LOGGER.error("could not parse header fields");
@@ -389,9 +412,14 @@ public class LogParserTask extends TimerTask {
 					+ "] timeDev:[" + timeDeviation + "] freqoffset:["
 					+ frequencyOffset + "] word1:[" + word1 + "] word2:["
 					+ word2 + "] word3:[" + word3 + "]");
-			spot = new Spot(time, signalReport, timeDeviation, frequencyOffset,
-					word1, word2, word3);
-
+			try{
+				spot = new Spot(DateTimeUtils.createXMLGregorianFromLocalDateTime(this.spotHeader.getDate(), time), this.spotterCallsign, time, signalReport, timeDeviation, frequencyOffset,
+						word1, word2, word3);
+			}
+			catch(DatatypeConfigurationException e){
+				
+				LOGGER.fatal("Failed to parse date and time for creating Spot", e);
+			}
 		} else {
 			LOGGER.error("could not parse header fields");
 		}
@@ -448,6 +476,14 @@ public class LogParserTask extends TimerTask {
 
 	void setLastLogParsedDateTime(LocalDateTime dateTime) {
 		this.lastLogParsedDateTime = dateTime;
+	}
+
+	public String getSpotterCallsign() {
+		return spotterCallsign;
+	}
+
+	public void setSpotterCallsign(String spotterCallsign) {
+		this.spotterCallsign = spotterCallsign;
 	}
 
 }
