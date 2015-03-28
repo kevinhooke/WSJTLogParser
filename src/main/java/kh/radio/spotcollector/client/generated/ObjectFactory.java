@@ -24,6 +24,7 @@ import javax.xml.namespace.QName;
 @XmlRegistry
 public class ObjectFactory {
 
+    private final static QName _JMSException_QNAME = new QName("http://endpoint.spotcollector.callsign.kh/", "JMSException");
     private final static QName _StoreSpots_QNAME = new QName("http://endpoint.spotcollector.callsign.kh/", "storeSpots");
     private final static QName _StoreSpotsResponse_QNAME = new QName("http://endpoint.spotcollector.callsign.kh/", "storeSpotsResponse");
 
@@ -51,11 +52,28 @@ public class ObjectFactory {
     }
 
     /**
+     * Create an instance of {@link JMSException }
+     * 
+     */
+    public JMSException createJMSException() {
+        return new JMSException();
+    }
+
+    /**
      * Create an instance of {@link Spot }
      * 
      */
     public Spot createSpot() {
         return new Spot();
+    }
+
+    /**
+     * Create an instance of {@link JAXBElement }{@code <}{@link JMSException }{@code >}}
+     * 
+     */
+    @XmlElementDecl(namespace = "http://endpoint.spotcollector.callsign.kh/", name = "JMSException")
+    public JAXBElement<JMSException> createJMSException(JMSException value) {
+        return new JAXBElement<JMSException>(_JMSException_QNAME, JMSException.class, null, value);
     }
 
     /**

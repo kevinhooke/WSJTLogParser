@@ -26,12 +26,15 @@ public interface SpotCollectorEndpoint {
     /**
      * 
      * @param arg0
+     * @throws JMSException_Exception
      */
     @WebMethod
     @RequestWrapper(localName = "storeSpots", targetNamespace = "http://endpoint.spotcollector.callsign.kh/", className = "kh.radio.spotcollector.client.generated.StoreSpots")
     @ResponseWrapper(localName = "storeSpotsResponse", targetNamespace = "http://endpoint.spotcollector.callsign.kh/", className = "kh.radio.spotcollector.client.generated.StoreSpotsResponse")
     public void storeSpots(
         @WebParam(name = "arg0", targetNamespace = "")
-        List<Spot> arg0);
+        List<Spot> arg0)
+        throws JMSException_Exception
+    ;
 
 }

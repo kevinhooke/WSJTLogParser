@@ -17,7 +17,7 @@ import javax.xml.ws.WebServiceFeature;
  * Generated source version: 2.2
  * 
  */
-@WebServiceClient(name = "SpotCollectorEndpointService", targetNamespace = "http://endpoint.spotcollector.callsign.kh/", wsdlLocation = "http://localhost:8080/callsignviz/SpotCollectorEndpoint?wsdl")
+@WebServiceClient(name = "SpotCollectorEndpointService", targetNamespace = "http://endpoint.spotcollector.callsign.kh/", wsdlLocation = "http://localhost:8080/SpotCollectorEndpoint?wsdl")
 public class SpotCollectorEndpointService
     extends Service
 {
@@ -30,7 +30,7 @@ public class SpotCollectorEndpointService
         URL url = null;
         WebServiceException e = null;
         try {
-            url = new URL("http://localhost:8080/callsignviz/SpotCollectorEndpoint?wsdl");
+            url = new URL("http://localhost:8080/SpotCollectorEndpoint?wsdl");
         } catch (MalformedURLException ex) {
             e = new WebServiceException(ex);
         }
