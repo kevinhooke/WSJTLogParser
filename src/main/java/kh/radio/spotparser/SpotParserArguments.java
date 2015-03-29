@@ -13,6 +13,9 @@ public class SpotParserArguments {
 	@Parameter(names = { "--resetlog" }, description = "Rests 'log line read' to reprocess all log file entries on the next run")
 	private boolean resetLog;
 
+	@Parameter(names = { "--file" }, description = "Path to the WSJT log file to process and upload for visualization")
+	private String pathToFile;
+	
 	public String getSpotterCallsign() {
 		return spotterCallsign;
 	}
@@ -35,6 +38,14 @@ public class SpotParserArguments {
 
 	public void setResetLog(boolean resetLog) {
 		this.resetLog = resetLog;
+	}
+
+	public String getPathToFile() {
+		return pathToFile;
+	}
+
+	public void setPathToFile(String pathToFile) {
+		this.pathToFile = pathToFile;
 	}
 
 }

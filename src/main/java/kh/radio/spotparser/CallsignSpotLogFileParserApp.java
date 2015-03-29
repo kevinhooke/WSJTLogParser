@@ -54,6 +54,10 @@ public class CallsignSpotLogFileParserApp {
 			System.exit(0);
 		}
 		
+		if(appArgs.getPathToFile() == null){
+			System.out.println("Required parameter: Must specify --file paramter pointing to full path file location of the WSJT file to be uploaded.");
+			System.exit(0);
+		}
 	}
 
 	private void resetLastLogParsed() {
@@ -69,8 +73,7 @@ public class CallsignSpotLogFileParserApp {
 
 		try {
 			this.timer = new Timer();
-			this.logParserTask = new LogParserTask(
-					"/Users/kev/develop/AmateurRadioCallsignSpotHistory/CallsignSpotParser/CallsignSpotParser/src/test/resources/ALL_pt1.TXT",
+			this.logParserTask = new LogParserTask(appArgs.getPathToFile(),
 					this.localEndpoint, appArgs.getSpotterCallsign());
 
 			this.timer.schedule(this.logParserTask, this.getMillisToFirstRun(), 60 * 1000);
