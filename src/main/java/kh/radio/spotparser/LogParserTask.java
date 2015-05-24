@@ -69,7 +69,7 @@ public class LogParserTask extends TimerTask {
 			.compile("\\d{4}[\\s]+-");
 	// 1950 -21 0.2 1231 # CQ KN8J EM99
 	private static final Pattern DECODED_SPOT_ALL_FIELDS_PATTERN = Pattern
-			.compile("(\\d{4})\\s+([-]?\\d{1,2})\\s+([-]?\\d+\\.\\d)\\s+(\\d{1,4})\\s+#\\s+(\\w+)\\s+(\\w+)\\s+([-]?\\w+)");
+			.compile("(\\d{4})\\s+([-]?\\d{1,2})\\s+([-]?\\d+\\.\\d)\\s+(\\d{1,4})\\s+[#|@]\\s+(\\w+)\\s+(\\w+)\\s+([-]?\\w+)");
 
 	// log line type: my tx
 	private static final Pattern TX_PATTERN = Pattern
@@ -204,26 +204,30 @@ public class LogParserTask extends TimerTask {
 
 			case DECODED_SPOT_LINE: {
 				spot = parseDecodedSpot(currentLine);
-				
-				spot.setRxFrequency(this.spotHeader.getRxFrequency());
-				try {
-					spot.setSpotReceivedTimestamp(
-							DateTimeUtils.createXMLGregorianFromLocalDateTime(
-									this.spotHeader.getDate(),
-									spot.getTime()));
-
-					spot.setSpotter(this.getSpotterCallsign());
-					// add spot to list ready to be uploaded
-					spots.add(spot);
-
-				} catch (DatatypeConfigurationException e) {
-					LOGGER.fatal("Failed to parse spot date and time to create Spot!", e);
+				if(spot == null){
+					LOGGER.error("Could not parse spot at line: " + lineCount);
 				}
-				
-				// update timestamp for last spot parsed
-				this.updateLastLogLineParsedTime(spot.getTime());
-
-				break;
+				else{
+					spot.setRxFrequency(this.spotHeader.getRxFrequency());
+					try {
+						spot.setSpotReceivedTimestamp(
+								DateTimeUtils.createXMLGregorianFromLocalDateTime(
+										this.spotHeader.getDate(),
+										spot.getTime()));
+	
+						spot.setSpotter(this.getSpotterCallsign());
+						// add spot to list ready to be uploaded
+						spots.add(spot);
+	
+					} catch (DatatypeConfigurationException e) {
+						LOGGER.fatal("Failed to parse spot date and time to create Spot!", e);
+					}
+					
+					// update timestamp for last spot parsed
+					this.updateLastLogLineParsedTime(spot.getTime());
+	
+					break;
+				}
 			}
 
 			case TX_LINE: {
