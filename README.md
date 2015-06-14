@@ -13,7 +13,15 @@ To use:
 - download the jar from the dist folder
 - from a command line:
 
-java -jar SpotvizLogUploader-1.0.jar --calsign YOUR_CALL -- file /PATH/TO/WSJT-X/ALL.TXT
+java -jar SpotvizLogUploader-1.0.jar --callsign YOUR_CALL --file /PATH/TO/WSJT-X/ALL.TXT
+
+where:
+YOUR_CALL is your callsign - this will be used to store your uploaded data against, so
+when searching for the call on the http://www.spotvi.info site you can find your
+uplaoded data.
+
+For example paths to the ALL.TXT file on different platforms, see the online docs
+here: http://www.spotviz.info/#/upload
 
 The parser runs once a minute on the minute to sync with new spots being logged to WSJT-X's
 ALL.TXT file. If you leave it running, it will continue to watch the file for new updates
