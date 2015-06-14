@@ -10,15 +10,17 @@ Pre-reqs:
 - requires Java SE 8. Download from here (http://www.java.com/en/) if you don't already have installed.
 
 To use:
-- download the jar from the dist folder
-- from a command line:
+- download SpotvizLogUploader-1.0.jar from the release page: https://github.com/kevinhooke/WSJTLogParser/releases/tag/1.0
+- save the downloaded jar to a folder locally
+- start a command prompt/shell/terminal, and from the command line cd into the folder 
+containing the downloaded jar and then type:
 
 java -jar SpotvizLogUploader-1.0.jar --callsign YOUR_CALL --file /PATH/TO/WSJT-X/ALL.TXT
 
 where:
 YOUR_CALL is your callsign - this will be used to store your uploaded data against, so
 when searching for the call on the http://www.spotvi.info site you can find your
-uplaoded data.
+uploaded data.
 
 For example paths to the ALL.TXT file on different platforms, see the online docs
 here: http://www.spotviz.info/#/upload
