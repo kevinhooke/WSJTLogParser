@@ -4,7 +4,7 @@ CallsignSpotParser
 Log parser and uploader for Amateur Radio software, WSJT (http://physics.princeton.edu/pulsar/k1jt/). 
 
 This is used to provide log visualization for stations received using WSJT, by uploading WSJT log files
-to http://spotviz.info (the source of this project is here: https://github.com/kevinhooke/SpotViz).
+to http://www.spotviz.info (the source of this project is here: https://github.com/kevinhooke/SpotViz).
 
 Pre-reqs:
 - requires Java SE 8. Download from here (http://www.java.com/en/) if you don't already have installed.
