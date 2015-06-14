@@ -6,7 +6,7 @@ Log parser and uploader for Amateur Radio software, WSJT (http://physics.princet
 This is used to provide log visualization for stations received using WSJT, by uploading WSJT log files
 to http://spotviz.info (the source of this project is here: https://github.com/kevinhooke/SpotViz).
 
-Rereqs:
+Pre-reqs:
 - requires Java SE 8. Download from here (http://www.java.com/en/) if you don't already have installed.
 
 To use:
