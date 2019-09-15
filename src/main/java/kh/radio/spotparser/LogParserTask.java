@@ -60,16 +60,29 @@ public class LogParserTask extends TimerTask {
 	private static final Pattern NEW_LINE_HEADER_PATTERN = Pattern
 			.compile("\\d{4}-\\w{3}-\\d{2}");
 	// 2014-Jul-07 19:40 14.076 MHz JT9+JT65
+	
+	// log line type: new date reception starting header v2.x
+	// LogLineType.NEW_DAY_HEADER_LINE_V2
+	private static final Pattern NEW_LINE_HEADER_PATTERN_V2 = Pattern
+			.compile("\\d{4}-\\d{2}-\\d{2}");
+	// 2017-12-03 00:32  14.076 MHz  JT9
+	
 	private static final Pattern NEW_LINE_HEADER_ALL_FIELDS_PATTERN = Pattern
 			.compile("(\\d{4}-\\w{3}-\\d{2})\\s+(\\d+:\\d+)\\s+(\\d+\\.\\d+)\\s+MHz");
 
+	private static final Pattern NEW_LINE_HEADER_ALL_FIELDS_PATTERN_V2 = Pattern
+			.compile("(\\d{4}-\\d{2}-\\d{2})\\s+(\\d+:\\d+)\\s+(\\d+\\.\\d+)\\s+MHz");
+	// 2017-12-03 00:32  14.076 MHz  JT9
+	
 	// log line type: decoded spot
 	// LogLineType.DECODED_SPOT_LINE
 	private static final Pattern DECODED_SPOT_PATTERN = Pattern
-			.compile("\\d{4}[\\s]+-");
-	// 1950 -21 0.2 1231 # CQ KN8J EM99
+			.compile("\\d{4,6}[\\s]+-");
+	// v1: 1950 -21 0.2 1231 # CQ KN8J EM99
+	// v2: 222845 -13  0.5  758 ~  K0BLT K4SBZ EM70
+	//updated first \\d patter for 4 to 6 digits to handle v1 and v2 pattern
 	private static final Pattern DECODED_SPOT_ALL_FIELDS_PATTERN = Pattern
-			.compile("(\\d{4})\\s+([-]?\\d{1,2})\\s+([-]?\\d+\\.\\d)\\s+(\\d{1,4})\\s+[#|@]\\s+(\\w+)\\s+(\\w+)\\s+([-]?\\w+)");
+			.compile("(\\d{4,6})\\s+([-]?\\d{1,2})\\s+([-]?\\d+\\.\\d)\\s+(\\d{1,4})\\s+[#|@|~]\\s+(\\w+)\\s+(\\w+)\\s+([-]?\\w+)");
 
 	// log line type: my tx
 	private static final Pattern TX_PATTERN = Pattern
@@ -197,12 +210,15 @@ public class LogParserTask extends TimerTask {
 			logLineType = this.identfyLineType(currentLine);
 
 			switch (logLineType) {
-			case NEW_DAY_HEADER_LINE: {
+			case NEW_DAY_HEADER_LINE:
+			case NEW_DAY_HEADER_LINE_V2:
+			{
 				this.spotHeader = parseReceiveSettings(currentLine);
 				break;
 			}
 
-			case DECODED_SPOT_LINE: {
+			case DECODED_SPOT_LINE: 
+			{
 				spot = parseDecodedSpot(currentLine);
 				if(spot == null){
 					LOGGER.error("Could not parse spot at line: " + lineCount);
@@ -247,14 +263,37 @@ public class LogParserTask extends TimerTask {
 
 		if (logLineType != null) {
 			// update last log line processed datetime
+			
+			boolean v1DateFormat = false;
+			if(Pattern.compile("\\d{4}-\\w{3}-\\d{2}").matcher(this.spotHeader.getDate()).find()) {
+				v1DateFormat = true;
+			}
+			
+			//TODO: refactor this block
+			
 			if (logLineType.equals(LogLineType.NEW_DAY_HEADER_LINE)) {
+				//TODO: the strip in this part is the only part that's different
 				// strip ":" from time in new day header line in log
-				this.lastLogParsedDateTime = DateTimeUtils.parseDateAndTime(
-						this.spotHeader.getDate(), this.spotHeader.getTime()
-								.replace(":", ""));
+				if(v1DateFormat) {
+					this.lastLogParsedDateTime = DateTimeUtils.parseDateAndTime(
+							this.spotHeader.getDate(), this.spotHeader.getTime()
+									.replace(":", ""));
+				}
+				else {
+					this.lastLogParsedDateTime = DateTimeUtils.parseDateAndTimeV2(
+							this.spotHeader.getDate(), this.spotHeader.getTime()
+									.replace(":", ""));
+					
+				}
 			} else if (logLineType.equals(LogLineType.DECODED_SPOT_LINE)) {
-				this.lastLogParsedDateTime = DateTimeUtils.parseDateAndTime(
-						this.spotHeader.getDate(), spot.getTime());
+				if(v1DateFormat) {
+					this.lastLogParsedDateTime = DateTimeUtils.parseDateAndTime(
+							this.spotHeader.getDate(), spot.getTime());
+				}
+				else {
+					this.lastLogParsedDateTime = DateTimeUtils.parseDateAndTimeV2(
+							this.spotHeader.getDate(), spot.getTime());
+				}
 			}
 
 			// send parsed spots to endpoint for storage
@@ -336,7 +375,18 @@ public class LogParserTask extends TimerTask {
 				if (lineHasNotBeenParsed(currentHeaderDateTime)) {
 					break;
 				}
-			} else if (type.equals(LogLineType.DECODED_SPOT_LINE)) {
+			}
+			else if (type.equals(LogLineType.NEW_DAY_HEADER_LINE_V2)) {
+				this.spotHeader = parseReceiveSettings(currentLine);
+				//append 00 on time here to make it match the same format as the spot lines
+				LocalDateTime currentHeaderDateTime = DateTimeUtils
+						.parseDateAndTimeV2(this.spotHeader.getDate(),
+								this.spotHeader.getTime().replace(":", "").concat("00"));
+				if (lineHasNotBeenParsed(currentHeaderDateTime)) {
+					break;
+				}
+			}
+			else if (type.equals(LogLineType.DECODED_SPOT_LINE)) {
 				// check if individual spot line has been parsed yet
 				spot = parseDecodedSpot(currentLine);
 
@@ -386,16 +436,30 @@ public class LogParserTask extends TimerTask {
 		ReceivedSpotHeader receiveHeader = null;
 		Matcher m = NEW_LINE_HEADER_ALL_FIELDS_PATTERN.matcher(currentLine);
 		if (m.find()) {
-			LOGGER.debug("...parsing header fields");
+			LOGGER.debug("...parsing header fields v1");
 			String date = m.group(1);
 			String time = m.group(2);
 			String freq = m.group(3);
 			LOGGER.debug("... date:[" + date + "] time:[" + time + "]" + " rxFreq:[" + freq + "]");
 			receiveHeader = new ReceivedSpotHeader(date, time, freq);
 
-		} else {
-			LOGGER.error("could not parse header fields");
 		}
+		else {
+			Matcher m2 = NEW_LINE_HEADER_ALL_FIELDS_PATTERN_V2.matcher(currentLine);
+			if (m2.find()) {
+				LOGGER.debug("...parsing header fields v2");
+				String date = m2.group(1);
+				String time = m2.group(2);
+				String freq = m2.group(3);
+				LOGGER.debug("... date:[" + date + "] time:[" + time + "]" + " rxFreq:[" + freq + "]");
+				receiveHeader = new ReceivedSpotHeader(date, time, freq);
+
+			}
+			else {
+				LOGGER.error("could not parse header fields");
+			}
+		}
+
 		return receiveHeader;
 	}
 
@@ -417,16 +481,44 @@ public class LogParserTask extends TimerTask {
 					+ frequencyOffset + "] word1:[" + word1 + "] word2:["
 					+ word2 + "] word3:[" + word3 + "]");
 			try{
-				spot = new Spot(DateTimeUtils.createXMLGregorianFromLocalDateTime(this.spotHeader.getDate(), time), this.spotterCallsign, time, signalReport, timeDeviation, frequencyOffset,
-						word1, word2, word3);
+				spot = new Spot(DateTimeUtils.createXMLGregorianFromLocalDateTime(this.spotHeader.getDate(), time), this.spotterCallsign, 
+						time, signalReport, timeDeviation, frequencyOffset, word1, word2, word3);
 			}
 			catch(DatatypeConfigurationException e){
 				
 				LOGGER.fatal("Failed to parse date and time for creating Spot", e);
 			}
-		} else {
-			LOGGER.error("could not parse header fields");
 		}
+//		else { 
+//			Matcher m2 = DECODED_SPOT_ALL_FIELDS_PATTERN_.matcher(currentLine);
+//		
+//			if (m2.find()) {
+//				LOGGER.info("...parsing spot fields");
+//				// 1950 -21 0.2 1231 # CQ KN8J EM99
+//				String time = m2.group(1);
+//				String signalReport = m2.group(2);
+//				String timeDeviation = m2.group(3);
+//				String frequencyOffset = m2.group(4);
+//				String word1 = m2.group(5);
+//				String word2 = m2.group(6);
+//				String word3 = m2.group(7);
+//				LOGGER.info("... time:[" + time + "] signal:[" + signalReport
+//						+ "] timeDev:[" + timeDeviation + "] freqoffset:["
+//						+ frequencyOffset + "] word1:[" + word1 + "] word2:["
+//						+ word2 + "] word3:[" + word3 + "]");
+//				try{
+//					spot = new Spot(DateTimeUtils.createXMLGregorianFromLocalDateTime(this.spotHeader.getDate(), time), this.spotterCallsign, time, signalReport, timeDeviation, frequencyOffset,
+//							word1, word2, word3);
+//				}
+//				catch(DatatypeConfigurationException e){
+//					
+//					LOGGER.fatal("Failed to parse date and time for creating Spot", e);
+//				}
+//			}
+//			else {
+//				LOGGER.error("could not parse header fields");
+//			}
+//		}
 		return spot;
 	}
 
@@ -438,25 +530,38 @@ public class LogParserTask extends TimerTask {
 			type = LogLineType.NEW_DAY_HEADER_LINE;
 			LOGGER.info("log file line read, type: header line");
 		} else {
-			Matcher rxMatcher = DECODED_SPOT_PATTERN.matcher(line);
-			if (rxMatcher.find()) {
-				type = LogLineType.DECODED_SPOT_LINE;
-				LOGGER.info("log file line read, type: rx spot line");
+			Matcher headerMatcherV2 = NEW_LINE_HEADER_PATTERN_V2.matcher(line);
+			if (headerMatcherV2.find()) {
+				type = LogLineType.NEW_DAY_HEADER_LINE_V2;
+				LOGGER.info("log file line read, type: header line v2");
 			} else {
-				Matcher txMatcher = TX_PATTERN.matcher(line);
-				if (txMatcher.find()) {
-					type = LogLineType.TX_LINE;
-					LOGGER.info("log file line read, type: tx line");
+				Matcher rxMatcher = DECODED_SPOT_PATTERN.matcher(line);
+				if (rxMatcher.find()) {
+					type = LogLineType.DECODED_SPOT_LINE;
+					LOGGER.info("log file line read, type: rx spot line");
 				} else {
-					type = LogLineType.UNKNOWN_LINE;
-					LOGGER.error("log file line read, type:  unknown line type");
+					Matcher txMatcher = TX_PATTERN.matcher(line);
+					if (txMatcher.find()) {
+						type = LogLineType.TX_LINE;
+						LOGGER.info("log file line read, type: tx line");
+					} else {
+						type = LogLineType.UNKNOWN_LINE;
+						LOGGER.error("log file line read, type:  unknown line type");
+					}
 				}
 			}
-
 		}
 		return type;
 	}
 
+	/**
+	 * Initializes the current spotHeader with date info for current section of file
+	 * @param headerLine
+	 */
+	public void initHeader(String headerLine){
+		this.spotHeader = parseReceiveSettings(headerLine);
+	}
+	
 	public String getLastLogParsedPreferencesKey() {
 		return lastLogParsedPreferencesKey;
 	}
