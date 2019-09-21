@@ -57,33 +57,39 @@ public class LogParserTask extends TimerTask {
 
 	// log line type: new date reception starting header
 	// LogLineType.NEW_DAY_HEADER_LINE
+	// 2014-Jul-07 19:40 14.076 MHz JT9+JT65
 	private static final Pattern NEW_LINE_HEADER_PATTERN = Pattern
 			.compile("\\d{4}-\\w{3}-\\d{2}");
-	// 2014-Jul-07 19:40 14.076 MHz JT9+JT65
 	
 	// log line type: new date reception starting header v2.x
 	// LogLineType.NEW_DAY_HEADER_LINE_V2
+	// 2017-12-03 00:32  14.076 MHz  JT9
 	private static final Pattern NEW_LINE_HEADER_PATTERN_V2 = Pattern
 			.compile("\\d{4}-\\d{2}-\\d{2}");
-	// 2017-12-03 00:32  14.076 MHz  JT9
-	
 	private static final Pattern NEW_LINE_HEADER_ALL_FIELDS_PATTERN = Pattern
 			.compile("(\\d{4}-\\w{3}-\\d{2})\\s+(\\d+:\\d+)\\s+(\\d+\\.\\d+)\\s+MHz");
-
 	private static final Pattern NEW_LINE_HEADER_ALL_FIELDS_PATTERN_V2 = Pattern
 			.compile("(\\d{4}-\\d{2}-\\d{2})\\s+(\\d+:\\d+)\\s+(\\d+\\.\\d+)\\s+MHz");
-	// 2017-12-03 00:32  14.076 MHz  JT9
 	
 	// log line type: decoded spot
 	// LogLineType.DECODED_SPOT_LINE
-	private static final Pattern DECODED_SPOT_PATTERN = Pattern
-			.compile("\\d{4,6}[\\s]+-");
 	// v1: 1950 -21 0.2 1231 # CQ KN8J EM99
 	// v2: 222845 -13  0.5  758 ~  K0BLT K4SBZ EM70
-	//updated first \\d patter for 4 to 6 digits to handle v1 and v2 pattern
+	private static final Pattern DECODED_SPOT_PATTERN = Pattern
+			.compile("\\d{4,6}[\\s]+-");
+	//updated first \\d pattern for 4 to 6 digits to handle v1 and v2 pattern
 	private static final Pattern DECODED_SPOT_ALL_FIELDS_PATTERN = Pattern
 			.compile("(\\d{4,6})\\s+([-]?\\d{1,2})\\s+([-]?\\d+\\.\\d)\\s+(\\d{1,4})\\s+[#|@|~]\\s+(\\w+)\\s+(\\w+)\\s+([-]?\\w+)");
 
+	// log line type: decoded spot
+	// LogLineType.DECODED_SPOT_LINE
+	// v2.1.0: 190908_052515    14.074 Rx FT8    -18  0.3 1304 VE7LLW AL7TC +03
+	
+	//TODO
+	
+	private static final Pattern DECODED_SPOT_PATTERN_V210 = Pattern
+			.compile("\\d{6}_\\d{6}[\\s]+\\d+\\.\\d+ Rx \\w+\\d+");
+	
 	// log line type: my tx
 	private static final Pattern TX_PATTERN = Pattern
 			.compile("\\d{4}[\\s]+Transmitting");
@@ -173,7 +179,7 @@ public class LogParserTask extends TimerTask {
 
 	/**
 	 * Parses log file lines. Checks to find last line not already parsed and
-	 * starts processin from that point.
+	 * starts processing from that point.
 	 * 
 	 * @return number of lines actually parsed (new lines, excludes lines
 	 *         previously parsed)
@@ -246,6 +252,40 @@ public class LogParserTask extends TimerTask {
 				}
 			}
 
+			//set header from same line
+			case DECODED_SPOT_LINE_v210: {
+			
+				//head date header fields first becuase v2.1.0 log file doesn't have header lines
+				//TODO:
+				
+				spot = parseDecodedSpot(currentLine);
+				if(spot == null){
+					LOGGER.error("Could not parse spot at line: " + lineCount);
+				}
+				else{
+					spot.setRxFrequency(this.spotHeader.getRxFrequency());
+					try {
+						spot.setSpotReceivedTimestamp(
+								DateTimeUtils.createXMLGregorianFromLocalDateTime(
+										this.spotHeader.getDate(),
+										spot.getTime()));
+	
+						spot.setSpotter(this.getSpotterCallsign());
+						// add spot to list ready to be uploaded
+						spots.add(spot);
+	
+					} catch (DatatypeConfigurationException e) {
+						LOGGER.fatal("Failed to parse spot date and time to create Spot!", e);
+					}
+					
+					// update timestamp for last spot parsed
+					this.updateLastLogLineParsedTime(spot.getTime());
+				}
+				
+				break;
+			}
+			
+			
 			case TX_LINE: {
 				tx = parseTx(currentLine);
 				break;
@@ -538,17 +578,24 @@ public class LogParserTask extends TimerTask {
 				Matcher rxMatcher = DECODED_SPOT_PATTERN.matcher(line);
 				if (rxMatcher.find()) {
 					type = LogLineType.DECODED_SPOT_LINE;
-					LOGGER.info("log file line read, type: rx spot line");
+					LOGGER.info("log file line read, type: rx spot line v1 or v2");
 				} else {
-					Matcher txMatcher = TX_PATTERN.matcher(line);
-					if (txMatcher.find()) {
-						type = LogLineType.TX_LINE;
-						LOGGER.info("log file line read, type: tx line");
-					} else {
-						type = LogLineType.UNKNOWN_LINE;
-						LOGGER.error("log file line read, type:  unknown line type");
+					Matcher rxMatcher2 = DECODED_SPOT_PATTERN_V210.matcher(line);
+					if (rxMatcher2.find()) {
+						type = LogLineType.DECODED_SPOT_LINE_v210;
+						LOGGER.info("log file line read, type: rx spot line v2.1.0");
 					}
-				}
+					else {
+						Matcher txMatcher = TX_PATTERN.matcher(line);
+						if (txMatcher.find()) {
+							type = LogLineType.TX_LINE;
+							LOGGER.info("log file line read, type: tx line");
+						} else {
+							type = LogLineType.UNKNOWN_LINE;
+							LOGGER.error("log file line read, type:  unknown line type");
+						}
+					}
+				} 
 			}
 		}
 		return type;
