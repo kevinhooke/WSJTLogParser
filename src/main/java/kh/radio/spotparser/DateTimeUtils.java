@@ -18,6 +18,9 @@ public class DateTimeUtils {
 	private static final DateTimeFormatter formatter_v2 =
             DateTimeFormatter.ofPattern("yyyy-MM-dd kkmmss").withZone(ZoneId.of("Z"));
 	
+	private static final DateTimeFormatter formatter_v210 =
+            DateTimeFormatter.ofPattern("yyMMdd kkmmss").withZone(ZoneId.of("Z"));
+	
 	public static long dateTimeToMillisUTC(LocalDateTime dateTime){
 		return dateTime.toInstant(ZoneOffset.UTC).toEpochMilli();
 		//return dateTime.toEpochSecond(ZoneOffset.UTC);
@@ -37,6 +40,14 @@ public class DateTimeUtils {
 		return LocalDateTime.parse(combined.toString(), formatter_v2);
 	}
 	
+	public static LocalDateTime parseDateAndTimeV210(String date, String time){
+		StringBuilder combined = new StringBuilder();
+		combined.append(date).append(" ").append(time);
+		
+		return LocalDateTime.parse(combined.toString(), formatter_v210);
+	}
+	
+	
 	public static LocalDateTime updateTime(LocalDateTime lastLogParsedDateTime,
 			String time) {
 		String hour = time.substring(0, 2);
@@ -55,6 +66,10 @@ public class DateTimeUtils {
 		//TODO: handling the old date format vs the new is the same here and in LogParserTask
 		if(Pattern.compile("\\d{4}-\\w{3}-\\d{2}").matcher(date).find()) {
 			dateTime = parseDateAndTime(date, time);
+		}
+		//if v2.1.0 date
+		else if(date.length() == 6){
+			dateTime = parseDateAndTimeV210(date, time);
 		}
 		else {
 			dateTime = parseDateAndTimeV2(date, time);

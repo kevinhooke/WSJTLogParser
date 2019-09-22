@@ -79,16 +79,14 @@ public class LogParserTask extends TimerTask {
 			.compile("\\d{4,6}[\\s]+-");
 	//updated first \\d pattern for 4 to 6 digits to handle v1 and v2 pattern
 	private static final Pattern DECODED_SPOT_ALL_FIELDS_PATTERN = Pattern
-			.compile("(\\d{4,6})\\s+([-]?\\d{1,2})\\s+([-]?\\d+\\.\\d)\\s+(\\d{1,4})\\s+[#|@|~]\\s+(\\w+)\\s+(\\w+)\\s+([-]?\\w+)");
+			.compile("(\\d{4,6})\\s+([-]?\\d{1,2})\\s+([-]?\\d+\\.\\d)\\s+(\\d{1,4})\\s+[#|@|~]\\s+(\\w+)\\s+(\\w+)\\s+(R?[-]?\\w+)");
 
 	// log line type: decoded spot
 	// LogLineType.DECODED_SPOT_LINE
-	// v2.1.0: 190908_052515    14.074 Rx FT8    -18  0.3 1304 VE7LLW AL7TC +03
-	
-	//TODO
-	
-	private static final Pattern DECODED_SPOT_PATTERN_V210 = Pattern
-			.compile("\\d{6}_\\d{6}[\\s]+\\d+\\.\\d+ Rx \\w+\\d+");
+	// v2.1.0:
+	// 190908_052515    14.074 Rx FT8    -18  0.3 1304 VE7LLW AL7TC +03
+	private static final Pattern DECODED_SPOT_ALL_FIELDS_PATTERN_V210 = Pattern
+			.compile("(\\d{6})_(\\d{6})\\s+(\\d+\\.\\d+)\\s+Rx\\s+(\\w+\\d+)\\s+(\\-\\d+)\\s+(\\d+\\.\\d+)\\s+(\\d{4})\\s+(\\w+)\\s+(\\w+)\\s+([\\+\\-]?[\\w]+)");
 	
 	// log line type: my tx
 	private static final Pattern TX_PATTERN = Pattern
@@ -255,8 +253,8 @@ public class LogParserTask extends TimerTask {
 			//set header from same line
 			case DECODED_SPOT_LINE_v210: {
 			
-				//head date header fields first becuase v2.1.0 log file doesn't have header lines
-				//TODO:
+				//parse date header fields first because v2.1.0 log file doesn't have header lines
+				this.spotHeader = parseReceiveSettings(currentLine);
 				
 				spot = parseDecodedSpot(currentLine);
 				if(spot == null){
@@ -496,8 +494,20 @@ public class LogParserTask extends TimerTask {
 
 			}
 			else {
-				LOGGER.error("could not parse header fields");
+				Matcher m3 = DECODED_SPOT_ALL_FIELDS_PATTERN_V210.matcher(currentLine);
+				if (m3.find()) {
+					LOGGER.debug("...parsing line fields v2.1.0");
+					String date = m3.group(1);
+					String time = m3.group(2);
+					String freq = m3.group(3);
+					LOGGER.debug("... date:[" + date + "] time:[" + time + "]" + " rxFreq:[" + freq + "]");
+					receiveHeader = new ReceivedSpotHeader(date, time, freq);
+				}
+				else {
+					LOGGER.error("could not parse header fields");
+				}
 			}
+
 		}
 
 		return receiveHeader;
@@ -529,36 +539,41 @@ public class LogParserTask extends TimerTask {
 				LOGGER.fatal("Failed to parse date and time for creating Spot", e);
 			}
 		}
-//		else { 
-//			Matcher m2 = DECODED_SPOT_ALL_FIELDS_PATTERN_.matcher(currentLine);
-//		
-//			if (m2.find()) {
-//				LOGGER.info("...parsing spot fields");
-//				// 1950 -21 0.2 1231 # CQ KN8J EM99
-//				String time = m2.group(1);
-//				String signalReport = m2.group(2);
-//				String timeDeviation = m2.group(3);
-//				String frequencyOffset = m2.group(4);
-//				String word1 = m2.group(5);
-//				String word2 = m2.group(6);
-//				String word3 = m2.group(7);
-//				LOGGER.info("... time:[" + time + "] signal:[" + signalReport
-//						+ "] timeDev:[" + timeDeviation + "] freqoffset:["
-//						+ frequencyOffset + "] word1:[" + word1 + "] word2:["
-//						+ word2 + "] word3:[" + word3 + "]");
-//				try{
-//					spot = new Spot(DateTimeUtils.createXMLGregorianFromLocalDateTime(this.spotHeader.getDate(), time), this.spotterCallsign, time, signalReport, timeDeviation, frequencyOffset,
-//							word1, word2, word3);
-//				}
-//				catch(DatatypeConfigurationException e){
-//					
-//					LOGGER.fatal("Failed to parse date and time for creating Spot", e);
-//				}
-//			}
-//			else {
-//				LOGGER.error("could not parse header fields");
-//			}
-//		}
+		else {
+			Matcher m2 = DECODED_SPOT_ALL_FIELDS_PATTERN_V210.matcher(currentLine);
+			if (m2.find()) {
+				LOGGER.info("...parsing v2.1.0 spot fields");
+				// g1     g2        g3        g4     g5   g6  g7   g8     g9    g10
+				// 190908_052515    14.074 Rx FT8    -18  0.3 1304 VE7LLW AL7TC +03
+				String date = m2.group(1);
+				String time = m2.group(2);
+				String rxFreq = m2.group(3);
+				String mode = m2.group(4);
+				String signalStrength = m2.group(5);
+				String timeDeviation = m2.group(6);
+				String frequencyOffset = m2.group(7);
+				String word1 = m2.group(8);
+				String word2 = m2.group(9);
+				String word3 = m2.group(10);
+				LOGGER.info("... date:[" + date + " time:[" + time + "] signal:[" + signalStrength
+						+ "] mode:[" + mode + "] timeDev:[" + timeDeviation + "] freqoffset:["
+						+ frequencyOffset + "] word1:[" + word1 + "] word2:["
+						+ word2 + "] word3:[" + word3 + "]");
+				
+				//set header fields set within each v2.1.0 log line info
+				this.spotHeader = new ReceivedSpotHeader(date, time, rxFreq);
+
+				try{
+					spot = new Spot(DateTimeUtils.createXMLGregorianFromLocalDateTime(this.spotHeader.getDate(), time), this.spotterCallsign, 
+							time, signalStrength, timeDeviation, frequencyOffset, word1, word2, word3);
+				}
+				catch(DatatypeConfigurationException e){
+					
+					LOGGER.fatal("Failed to parse date and time for creating Spot", e);
+				}
+			}
+		}
+		
 		return spot;
 	}
 
@@ -580,7 +595,7 @@ public class LogParserTask extends TimerTask {
 					type = LogLineType.DECODED_SPOT_LINE;
 					LOGGER.info("log file line read, type: rx spot line v1 or v2");
 				} else {
-					Matcher rxMatcher2 = DECODED_SPOT_PATTERN_V210.matcher(line);
+					Matcher rxMatcher2 = DECODED_SPOT_ALL_FIELDS_PATTERN_V210.matcher(line);
 					if (rxMatcher2.find()) {
 						type = LogLineType.DECODED_SPOT_LINE_v210;
 						LOGGER.info("log file line read, type: rx spot line v2.1.0");
