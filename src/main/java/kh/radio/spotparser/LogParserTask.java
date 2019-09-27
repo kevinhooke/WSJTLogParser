@@ -332,6 +332,9 @@ public class LogParserTask extends TimerTask {
 					this.lastLogParsedDateTime = DateTimeUtils.parseDateAndTimeV2(
 							this.spotHeader.getDate(), spot.getTime());
 				}
+			} else if (logLineType.equals(LogLineType.DECODED_SPOT_LINE_v210)) {
+				this.lastLogParsedDateTime = DateTimeUtils.parseDateAndTimeV210(
+						this.spotHeader.getDate(), spot.getTime());
 			}
 
 			// send parsed spots to endpoint for storage
@@ -350,7 +353,7 @@ public class LogParserTask extends TimerTask {
 					//TODO: change this to be property driven
 					SpotCollectorEndpointService service = new SpotCollectorEndpointService(
 							new URL(
-									"http://callsignviz2-kjh.rhcloud.com/SpotCollectorEndpoint?wsdl"),
+									"http://192.168.1.65:8080/SpotCollectorEndpoint?wsdl"),
 							new QName(
 									"http://endpoint.spotcollector.callsign.kh/",
 									"SpotCollectorEndpointService"));
@@ -360,9 +363,13 @@ public class LogParserTask extends TimerTask {
 					bindingProvider
 							.getRequestContext()
 							.put(BindingProvider.ENDPOINT_ADDRESS_PROPERTY,
-									"http://callsignviz2-kjh.rhcloud.com/SpotCollectorEndpoint");
+									"http://192.168.1.65:8080/SpotCollectorEndpoint");
 				}
 				try{
+					//TODO this logic needs to be checked, intent is to split into blocks of max 50
+//					for(int subListStartIndex = 0; subListStartIndex < spots.size(); subListStartIndex += 50) {
+//						endpoint.storeSpots(spots.subList(subListStartIndex, subListStartIndex + 50));
+//					}
 					endpoint.storeSpots(spots);
 				}
 				catch(JMSException_Exception e){
@@ -435,7 +442,18 @@ public class LogParserTask extends TimerTask {
 					break;
 				}
 			}
+			else if (type.equals(LogLineType.DECODED_SPOT_LINE_v210)) {
+				this.spotHeader = parseReceiveSettings(currentLine);
+				// check if individual spot line has been parsed yet
+				spot = parseDecodedSpot(currentLine);
 
+				LocalDateTime currentSpotDateTime = DateTimeUtils
+						.parseDateAndTimeV210(this.spotHeader.getDate(),
+								spot.getTime());
+				if (lineHasNotBeenParsed(currentSpotDateTime)) {
+					break;
+				}
+			}
 			// read next line
 			currentLine = this.reader.nextLine();
 		}
