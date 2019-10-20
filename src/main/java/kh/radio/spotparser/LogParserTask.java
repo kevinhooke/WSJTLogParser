@@ -2,6 +2,7 @@ package kh.radio.spotparser;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -54,7 +55,11 @@ public class LogParserTask extends TimerTask {
 	private ReceivedSpotHeader spotHeader = null;
 	private String lastLogParsedPreferencesKey = LAST_LOG_PARSED;
 	private String spotterCallsign;
-
+	private int maxUploads;
+	private int uploadSize;
+	private int uploadPauseTime;
+	private SpotCollectorEndpoint endpoint;
+	
 	// log line type: new date reception starting header
 	// LogLineType.NEW_DAY_HEADER_LINE
 	// 2014-Jul-07 19:40 14.076 MHz JT9+JT65
@@ -97,14 +102,27 @@ public class LogParserTask extends TimerTask {
 	public LogParserTask() {
 	}
 
-	public LogParserTask(String filePath, boolean localTestMode, String spotterCallsign)
+	public LogParserTask(String filePath, boolean localTestMode, String spotterCallsign,
+			int maxUploads, int uploadSize, int uploadPauseTime)
 			throws Exception {
 		this.filePath = filePath;
 		this.reader = new LogFileReader(filePath);
 		this.localTestMode = localTestMode;
 		this.spotterCallsign = spotterCallsign;
+		this.maxUploads = maxUploads;
+		this.uploadSize = uploadSize;
+		this.uploadPauseTime = uploadPauseTime;
 		this.initPreferences();
+		
+		this.endpoint = this.getSpotCollectorEndpoint();
 
+		//upload sleep time defaults to 5secs if not set
+		if(this.uploadPauseTime == 0) {
+			this.uploadPauseTime = 5000;
+		} else {
+			this.uploadPauseTime = this.uploadPauseTime * 1000;
+		}
+		
 		// TODO: need to load endpoint properties from property file here
 	}
 
@@ -116,21 +134,22 @@ public class LogParserTask extends TimerTask {
 	public void run() {
 		LocalDateTime start = LocalDateTime.now(ZoneId.of("Z"));
 		LOGGER.info("Starting file check at: " + start);
+		
+		//TODO: this line is outputting 1970 even though the date check appears to be working
 		LOGGER.info("... last log line parsed: " + this.lastLogParsedDateTime);
 		try {
 			this.parseAllLines();
-			storeLastLogLineProcessedTime();
 		} catch (IOException ioe) {
 			LOGGER.error("ERRROR! Failed to read log file!", ioe);
 		}
-
+		this.cancel();
 	}
 
 	/**
 	 * Stores last log line processed time to Preferences store
 	 */
 	void storeLastLogLineProcessedTime() {
-
+		//TODO: this line is outputting 1970 even though the date check logic appears right
 		LOGGER.info("Saving lastLogParsedDateTime to preferences:"
 				+ this.lastLogParsedDateTime);
 		long millis = DateTimeUtils
@@ -205,9 +224,10 @@ public class LogParserTask extends TimerTask {
 
 		LogLineType logLineType = null;
 		Spot spot = null;
-
-		while (currentLine != null) {
-			LOGGER.info("line " + lineCount);
+		//if --maxuploads specfied then iterate up to the max specified, otherwise process all lines
+		while (currentLine != null && (this.maxUploads == 0 ? true : lineCount < this.maxUploads)) {
+			LOGGER.info("Parsing current line " + lineCount + " of max lines to upload (--maxupload): " 
+					+ (this.maxUploads == 0 ? "all lines in file" : this.maxUploads));
 
 			TXMessage tx = null;
 
@@ -339,38 +359,44 @@ public class LogParserTask extends TimerTask {
 
 			// send parsed spots to endpoint for storage
 			if (spots != null && spots.size() > 0) {
-				SpotCollectorEndpoint endpoint = null;
-
-				if (this.localTestMode) {
-					SpotCollectorEndpointService service = new SpotCollectorEndpointService(new URL(
-							"http://localhost:8080/SpotCollectorEndpoint?wsdl"),
-					new QName(
-							"http://endpoint.spotcollector.callsign.kh/",
-							"SpotCollectorEndpointService"));
-					endpoint = service.getSpotCollectorEndpointPort();
-
-				} else {
-					//TODO: change this to be property driven
-					SpotCollectorEndpointService service = new SpotCollectorEndpointService(
-							new URL(
-									"http://192.168.1.65:8080/SpotCollectorEndpoint?wsdl"),
-							new QName(
-									"http://endpoint.spotcollector.callsign.kh/",
-									"SpotCollectorEndpointService"));
-					endpoint = service.getSpotCollectorEndpointPort();
-
-					BindingProvider bindingProvider = (BindingProvider) endpoint;
-					bindingProvider
-							.getRequestContext()
-							.put(BindingProvider.ENDPOINT_ADDRESS_PROPERTY,
-									"http://192.168.1.65:8080/SpotCollectorEndpoint");
-				}
+				
 				try{
-					//TODO this logic needs to be checked, intent is to split into blocks of max 50
-//					for(int subListStartIndex = 0; subListStartIndex < spots.size(); subListStartIndex += 50) {
-//						endpoint.storeSpots(spots.subList(subListStartIndex, subListStartIndex + 50));
-//					}
-					endpoint.storeSpots(spots);
+					//TODO this logic needs to be checked for < 50 and last block if not divisible by 50
+					
+					//TODO this logic seems to stop early: Uploading: 14300 to 14350 of total: 31637
+					//TODO spot max size doesn't appear to match lines in file
+					
+					//split list of Spots into blocks to avoid sending massive payload in one go, defaults to 50
+					if(this.uploadSize == 0) {
+						this.uploadSize = 50;
+					}
+					
+					//set max uploads
+					if(this.maxUploads == 0) {
+						this.maxUploads = spots.size();
+					}
+					
+					for(int subListStartIndex = 0; subListStartIndex < spots.size(); subListStartIndex += this.uploadSize) {
+						int subListEndIndex = 0;
+						if(subListStartIndex + this.uploadSize < spots.size()) {
+							subListEndIndex = subListStartIndex + this.uploadSize;
+						}
+						else {
+							subListEndIndex = spots.size(); //subList() end index is exclusive
+						}
+						LOGGER.info("Uploading: " + subListStartIndex + " to " + (subListEndIndex -1)
+								+ " of total: " + spots.size()); 
+						endpoint.storeSpots(spots.subList(subListStartIndex, subListEndIndex));
+		
+						//TODO test this change here
+						this.storeLastLogLineProcessedTime();
+						try {
+							Thread.sleep(this.uploadPauseTime);
+						} catch (InterruptedException e) {
+							// TODO Auto-generated catch block
+							e.printStackTrace();
+						}
+					}
 				}
 				catch(JMSException_Exception e){
 					LOGGER.error("Failed to send spot data to endpoint!", e);
@@ -384,6 +410,39 @@ public class LogParserTask extends TimerTask {
 		}
 
 		return spots.size();
+	}
+
+	private SpotCollectorEndpoint getSpotCollectorEndpoint() throws MalformedURLException {
+		SpotCollectorEndpoint endpoint = null;
+
+		if (this.localTestMode) {
+			SpotCollectorEndpointService service = new SpotCollectorEndpointService(new URL(
+					"http://localhost:8080/SpotCollectorEndpoint?wsdl"),
+			new QName(
+					"http://endpoint.spotcollector.callsign.kh/",
+					"SpotCollectorEndpointService"));
+			endpoint = service.getSpotCollectorEndpointPort();
+
+		} else {
+			//TODO: change this to be property driven
+			SpotCollectorEndpointService service = new SpotCollectorEndpointService(
+//							new URL(
+//									"http://192.168.1.65:8080/SpotCollectorEndpoint?wsdl"),
+					new URL(
+							"http://www.spotviz.info/SpotCollectorEndpoint?wsdl"),
+					new QName(
+							"http://endpoint.spotcollector.callsign.kh/",
+							"SpotCollectorEndpointService"));
+			endpoint = service.getSpotCollectorEndpointPort();
+
+			BindingProvider bindingProvider = (BindingProvider) endpoint;
+			bindingProvider
+					.getRequestContext()
+					.put(BindingProvider.ENDPOINT_ADDRESS_PROPERTY,
+//									"http://192.168.1.65:8080/SpotCollectorEndpoint");
+							"http://www.spotviz.info/SpotCollectorEndpoint");
+		}
+		return endpoint;
 	}
 
 	/**
@@ -673,6 +732,15 @@ public class LogParserTask extends TimerTask {
 
 	public void setSpotterCallsign(String spotterCallsign) {
 		this.spotterCallsign = spotterCallsign;
+	}
+
+	public String getLastLogLineParsed() {
+		this.initPreferences();
+		return "todo";
+	}
+
+	public void setEndpoint(SpotCollectorEndpoint endpoint) {
+		this.endpoint = endpoint;
 	}
 
 }

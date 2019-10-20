@@ -7,13 +7,14 @@ import java.util.prefs.BackingStoreException;
 import com.beust.jcommander.JCommander;
 
 /**
- * Standalone log parser app. Runs on a timer to run at 10 seconds past each
- * minute. This is intended to watch and monitor spots in the live WSJT log
- * file, but only run during the period where WSJT is receiving, so the parsing
- * of latest log file entries is complete by the time WSJT writes to the file
- * again on the next decode (at apparently 50 seconds past the minute.
+ * Standalone log parser app for WSJX-X log files (ALL.TXT). 
  * 
- * @author kevin.hooke
+ * Runs on a timer to run at 10 seconds past each minute. This is intended to watch 
+ * and monitor spots in the live WSJT log file, but only run during the period where 
+ * WSJT is receiving, so the parsing of latest log file entries is complete by the time 
+ * WSJT writes to the file again on the next decode (at apparently 50 seconds past the minute.
+ * 
+ * @author kevinhooke
  *
  */
 public class CallsignSpotLogFileParserApp {
@@ -58,6 +59,17 @@ public class CallsignSpotLogFileParserApp {
 			System.out.println("Required parameter: Must specify --file paramter pointing to full path file location of the WSJT file to be uploaded.");
 			System.exit(0);
 		}
+		
+		if(appArgs.isShowLastdate()) {
+			this.showLastDate();
+			System.exit(0);
+		}
+	}
+
+	private void showLastDate() {
+		String lastDate = new LogParserTask().getLastLogLineParsed();
+		System.out.println("Log line last parsed: " + lastDate);
+		
 	}
 
 	private void resetLastLogParsed() {
@@ -74,7 +86,8 @@ public class CallsignSpotLogFileParserApp {
 		try {
 			this.timer = new Timer();
 			this.logParserTask = new LogParserTask(appArgs.getPathToFile(),
-					this.localEndpoint, appArgs.getSpotterCallsign());
+					this.localEndpoint, appArgs.getSpotterCallsign(), appArgs.getMaxUploads(),
+					appArgs.getUploadsize(), appArgs.getUploadPauseTime());
 
 			this.timer.schedule(this.logParserTask, this.getMillisToFirstRun(), 60 * 1000);
 		} catch (Exception e) {

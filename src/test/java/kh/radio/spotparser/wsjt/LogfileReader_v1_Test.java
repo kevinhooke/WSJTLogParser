@@ -28,7 +28,7 @@ public class LogfileReader_v1_Test {
 		
 		String line = this.reader.nextLine();
 		LogParserTask task = new LogParserTask("./src/test/resources/ALL-2014.TXT",
-				true, "test");
+				true, "test", 0, 0, 0);
 		LogLineType type = task.identfyLineType(line);
 		
 		TestCase.assertEquals(LogLineType.NEW_DAY_HEADER_LINE, type);

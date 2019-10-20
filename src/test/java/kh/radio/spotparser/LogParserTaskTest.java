@@ -1,5 +1,6 @@
 package kh.radio.spotparser;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import java.io.BufferedWriter;
@@ -8,11 +9,23 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.StringReader;
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.prefs.BackingStoreException;
 
+import kh.radio.spotcollector.client.generated.JMSException_Exception;
+import kh.radio.spotcollector.client.generated.Spot;
+import kh.radio.spotcollector.client.generated.SpotCollectorEndpoint;
 import kh.radio.spotparser.wsjt.LogFileReader;
 
 import org.junit.Test;
-
+/**
+ * TODO there's an issue with these test, possible on replying on the setting and reading
+ * of the last date from preferences that means individually the tests all pass, but running
+ * together there's an unexpected sideefect between tests that causes them to randomly fail.
+ * 
+ * @author kevinhooke
+ *
+ */
 public class LogParserTaskTest {
 
 	private static final String HEADER_set1_1 = "2014-Jul-07 19:40  14.076 MHz  JT9+JT65\n";
@@ -33,9 +46,14 @@ public class LogParserTaskTest {
 	}
 
 	private LogParserTask createTestTaskWithFile(String pathToFile) throws Exception{
-		LogParserTask task = new LogParserTask(pathToFile, true, "test");
+		
+		//TODO: this constructor needs to not init the endpoint to be able to work with server not running
+		
+		LogParserTask task = new LogParserTask(pathToFile, true, "test", 0, 0, 0);
 		task.setLastLogParsedPreferencesKey(LogParserTask.LAST_LOG_PARSED_TEST);
 		task.initPreferences();
+		//mock collector endpoint
+		task.setEndpoint(this.getMockCollectorEndpoint());
 		return task;
 	}
 	
@@ -69,20 +87,28 @@ public class LogParserTaskTest {
 	
 	
 	@Test
-	public void testParseOneLine() throws IOException {
+	public void testParseOneLine() throws Exception {
 
 		StringBuilder sb = new StringBuilder();
 		sb.append(HEADER_set1_1);
 		sb.append(LINE_set1_2);
 
 		LogParserTask task = this.createTestTask(sb.toString());
+		task.resetlastLogParsedDateTimeStoredPreference();
+		
+		//mock collector endpoint
+		task.setEndpoint(this.getMockCollectorEndpoint());
 		
 		int linesProcessed = task.parseAllLines();
-		assertTrue("Expecting 1 line processed", linesProcessed == 1);
+		assertEquals("Expectied 1 line processed", 1, linesProcessed);
+		
+		//retest with same lines to test lastLogParsedDateTime is checked
+		linesProcessed = task.parseAllLines();
+		assertEquals("Expected 0 lines processed", 0, linesProcessed);
 	}
 
 	@Test
-	public void testParseTwoLines() throws IOException {
+	public void testParseTwoLines() throws Exception {
 
 		StringBuilder sb = new StringBuilder();
 		sb.append(HEADER_set1_1);
@@ -91,9 +117,17 @@ public class LogParserTaskTest {
 		
 
 		LogParserTask task = this.createTestTask(sb.toString());
+		task.resetlastLogParsedDateTimeStoredPreference();
+		
+		//mock collector endpoint
+		task.setEndpoint(this.getMockCollectorEndpoint());
 		
 		int linesProcessed = task.parseAllLines();
-		assertTrue("Expecting 2 line processed", linesProcessed == 2);
+		assertEquals("Expected 2 line processed", 2, linesProcessed);
+		
+		//retest with same lines to test lastLogParsedDateTime is checked
+		linesProcessed = task.parseAllLines();
+		assertEquals("Expected 0 lines processed", 0, linesProcessed);
 	}
 
 	@Test
@@ -111,6 +145,8 @@ public class LogParserTaskTest {
 		writer.flush();
 		System.out.println("temp file: " + testFile.getAbsolutePath());
 		LogParserTask task = this.createTestTaskWithFile(testFile.getAbsolutePath());
+		task.resetlastLogParsedDateTimeStoredPreference();
+
 		
 		//TODO: need need to mock out the endpoint so parsed lines are not actually sent to endpoint
 		int linesProcessed = task.parseAllLines();
@@ -125,5 +161,15 @@ public class LogParserTaskTest {
 		assertTrue("Expecting only 1 newly added line processed", linesProcessed == 1);
 	}
 	
+	private SpotCollectorEndpoint getMockCollectorEndpoint() {
+		return new SpotCollectorEndpoint() {
+
+			@Override
+			public void storeSpots(List<Spot> arg0) throws JMSException_Exception {
+				// do nothing
+			}
+			
+		};
+	}
 	
 }

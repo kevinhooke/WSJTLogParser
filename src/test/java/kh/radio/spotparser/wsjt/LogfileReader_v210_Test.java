@@ -28,7 +28,7 @@ public class LogfileReader_v210_Test {
 		
 		String line = this.reader.nextLine();
 		LogParserTask task = new LogParserTask("./src/test/resources/ALL-2019-v2.1.0-test.TXT",
-				true, "test");
+				true, "test", 0, 0, 0);
 		LogLineType type = task.identfyLineType(line);
 		
 		TestCase.assertEquals(LogLineType.DECODED_SPOT_LINE_v210, type);
