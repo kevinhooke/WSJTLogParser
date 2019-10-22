@@ -22,6 +22,14 @@ public class LogfileReader_v1_Test {
 		System.out.println(line);
 	}
 
+	/**
+	 * new LogParserTask() with 2nd param = true requires local server to be up for a local
+	 * integration test.
+	 * 
+	 * //TODO: why is this needed?
+	 * 
+	 * @throws Exception
+	 */
 	@Test
 	public void testIdentifyFirstLine_v1() throws Exception{
 		this.reader = new LogFileReader("./src/test/resources/ALL-2014.TXT");
@@ -98,5 +106,42 @@ public class LogfileReader_v1_Test {
 		TestCase.assertEquals("N1ABC", spot.getWord2());
 		TestCase.assertEquals("-01", spot.getWord3());
 	}      
+
+	@Test
+	public void testKP4MD_2016_exampleSpotLine1() {
+		LogParserTask task = new LogParserTask();
+		task.initHeader("2016-Apr-20 02:26  7.076 MHz  JT9");
+		Spot spot = task.parseDecodedSpot("0232 -10  0.9 1949 # AC8VV AC0TG DM79");
+		
+		TestCase.assertNotNull(spot);
+		TestCase.assertEquals("0232", spot.getTime());
+		TestCase.assertEquals("-10", spot.getSignalreport());
+		TestCase.assertEquals("1949", spot.getFrequencyOffset());
+		TestCase.assertEquals("0.9", spot.getTimeDeviation());
+		TestCase.assertEquals("AC8VV", spot.getWord1());
+		TestCase.assertEquals("AC0TG", spot.getWord2());
+		TestCase.assertEquals("DM79", spot.getWord3());
+	}
+
+	/**
+	 * Tests log line from KP4MD 2016 ALL.TXT file: this line has a concatenated response in 2 cols
+	 * instead of 3.
+	 * 
+	 */
+	@Test
+	public void testKP4MD_2016_exampleSpotLine2_withConcatResponse() {
+		LogParserTask task = new LogParserTask();
+		task.initHeader("2016-Apr-20 02:26  7.076 MHz  JT9");
+		Spot spot = task.parseDecodedSpot("0232  -6  0.6 2124 # UR7ITU RRTU73");
+		
+		TestCase.assertNotNull(spot);
+		TestCase.assertEquals("0232", spot.getTime());
+		TestCase.assertEquals("-6", spot.getSignalreport());
+		TestCase.assertEquals("2124", spot.getFrequencyOffset());
+		TestCase.assertEquals("0.6", spot.getTimeDeviation());
+		TestCase.assertEquals("UR7ITU", spot.getWord1());
+		TestCase.assertEquals("RRTU73", spot.getWord2());
+		TestCase.assertEquals("", spot.getWord3());
+	}
 
 }

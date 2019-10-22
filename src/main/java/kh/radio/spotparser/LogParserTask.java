@@ -84,7 +84,7 @@ public class LogParserTask extends TimerTask {
 			.compile("\\d{4,6}[\\s]+-");
 	//updated first \\d pattern for 4 to 6 digits to handle v1 and v2 pattern
 	private static final Pattern DECODED_SPOT_ALL_FIELDS_PATTERN = Pattern
-			.compile("(\\d{4,6})\\s+([-]?\\d{1,2})\\s+([-]?\\d+\\.\\d)\\s+(\\d{1,4})\\s+[#|@|~]\\s+(\\w+)\\s+(\\w+)\\s+(R?[-]?\\w+)");
+			.compile("(\\d{4,6})\\s+([-]?\\d{1,2})\\s+([-]?\\d+\\.\\d)\\s+(\\d{1,4})\\s+[#|@|~]\\s+(\\w+)\\s+(\\w+)\\s*(R?[-]?\\w*)");
 
 	// log line type: decoded spot
 	// LogLineType.DECODED_SPOT_LINE
@@ -429,7 +429,7 @@ public class LogParserTask extends TimerTask {
 //							new URL(
 //									"http://192.168.1.65:8080/SpotCollectorEndpoint?wsdl"),
 					new URL(
-							"http://www.spotviz.info/SpotCollectorEndpoint?wsdl"),
+							"http://api.spotviz.info/SpotCollectorEndpoint?wsdl"),
 					new QName(
 							"http://endpoint.spotcollector.callsign.kh/",
 							"SpotCollectorEndpointService"));
@@ -440,7 +440,7 @@ public class LogParserTask extends TimerTask {
 					.getRequestContext()
 					.put(BindingProvider.ENDPOINT_ADDRESS_PROPERTY,
 //									"http://192.168.1.65:8080/SpotCollectorEndpoint");
-							"http://www.spotviz.info/SpotCollectorEndpoint");
+							"http://api.spotviz.info/SpotCollectorEndpoint");
 		}
 		return endpoint;
 	}
