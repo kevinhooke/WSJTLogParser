@@ -84,14 +84,14 @@ public class LogParserTask extends TimerTask {
 			.compile("\\d{4,6}[\\s]+-");
 	//updated first \\d pattern for 4 to 6 digits to handle v1 and v2 pattern
 	private static final Pattern DECODED_SPOT_ALL_FIELDS_PATTERN = Pattern
-			.compile("(\\d{4,6})\\s+([-]?\\d{1,2})\\s+([-]?\\d+\\.\\d)\\s+(\\d{1,4})\\s+[#|@|~]\\s+(\\w+)\\s+(\\w+)\\s*(R?[-]?\\w*)");
+			.compile("(\\d{4,6})\\s+([-]?\\d{1,2})\\s+([-]?\\d+\\.\\d)\\s+(\\d{1,4})\\s+[#|@|~]\\s+([\\w\\/\\?\\-]+)\\s+([\\w\\/\\?\\-]+)\\s*(R?[-]?\\w*)");
 
 	// log line type: decoded spot
 	// LogLineType.DECODED_SPOT_LINE
 	// v2.1.0:
 	// 190908_052515    14.074 Rx FT8    -18  0.3 1304 VE7LLW AL7TC +03
 	private static final Pattern DECODED_SPOT_ALL_FIELDS_PATTERN_V210 = Pattern
-			.compile("(\\d{6})_(\\d{6})\\s+(\\d+\\.\\d+)\\s+Rx\\s+(\\w+\\d+)\\s+(\\-\\d+)\\s+(\\d+\\.\\d+)\\s+(\\d{4})\\s+(\\w+)\\s+(\\w+)\\s+([\\+\\-]?[\\w]+)");
+			.compile("(\\d{6})_(\\d{6})\\s+(\\d+\\.\\d+)\\s+Rx\\s+(\\w+\\d+)\\s+(\\-\\d+)\\s+(\\d+\\.\\d+)\\s+(\\d{4})\\s+([\\w\\/\\?\\-]+)\\s+([\\w\\/\\?\\-]+)\\s+([\\+\\-]?[\\w]+)");
 	
 	// log line type: my tx
 	private static final Pattern TX_PATTERN = Pattern

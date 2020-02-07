@@ -108,7 +108,7 @@ public class LogfileReader_v1_Test {
 	}      
 
 	@Test
-	public void testKP4MD_2016_exampleSpotLine1() {
+	public void testKP4MD_2016_exampleSpotLine() {
 		LogParserTask task = new LogParserTask();
 		task.initHeader("2016-Apr-20 02:26  7.076 MHz  JT9");
 		Spot spot = task.parseDecodedSpot("0232 -10  0.9 1949 # AC8VV AC0TG DM79");
@@ -129,7 +129,7 @@ public class LogfileReader_v1_Test {
 	 * 
 	 */
 	@Test
-	public void testKP4MD_2016_exampleSpotLine2_withConcatResponse() {
+	public void testKP4MD_2016_exampleSpotLine_withConcatResponse() {
 		LogParserTask task = new LogParserTask();
 		task.initHeader("2016-Apr-20 02:26  7.076 MHz  JT9");
 		Spot spot = task.parseDecodedSpot("0232  -6  0.6 2124 # UR7ITU RRTU73");
@@ -142,6 +142,86 @@ public class LogfileReader_v1_Test {
 		TestCase.assertEquals("UR7ITU", spot.getWord1());
 		TestCase.assertEquals("RRTU73", spot.getWord2());
 		TestCase.assertEquals("", spot.getWord3());
+	}
+
+	
+	/**
+	 * Tests log line from KP4MD 2016 ALL.TXT file: this line has a area/ prefxied callsign:
+	 * 
+	 * 0001  -4  0.3 1058 # YN/TG9IIN AF5ZJ
+	 * 
+	 */
+	@Test
+	public void testKP4MD_2016_exampleSpotLine_withSlashPrefixCallsign() {
+		LogParserTask task = new LogParserTask();
+		task.initHeader("2016-Apr-20 02:26  7.076 MHz  JT9");
+		Spot spot = task.parseDecodedSpot("0001  -4  0.3 1058 # YN/TG9IIN AF5ZJ");
+		
+		TestCase.assertNotNull(spot);
+		TestCase.assertEquals("0001", spot.getTime());
+		TestCase.assertEquals("-4", spot.getSignalreport());
+		TestCase.assertEquals("1058", spot.getFrequencyOffset());
+		TestCase.assertEquals("0.3", spot.getTimeDeviation());
+		TestCase.assertEquals("YN/TG9IIN", spot.getWord1());
+		TestCase.assertEquals("AF5ZJ", spot.getWord2());
+		TestCase.assertEquals("", spot.getWord3());
+	}
+
+	
+	/**
+	 * Parsing fails for unexpected line:
+	 * 0254 -15  0.5 1050 # .............  
+	 */
+	//TODO: add handling for this
+	
+	/**
+	 * Parsing fails for unexpected line:
+	 * 9999 -99  1.0 0000 # QRZ/LOTW  
+	 */
+	//TODO: add handling for this
+	
+	
+	/**
+	 * Tests log line from KP4MD 2016 ALL.TXT file: this line has a '?' in the first word: 
+	 * 
+	 * 0348 -14 -0.4 2814 @ QRZ? VK3AUQ  
+	 */
+	@Test
+	public void testKP4MD_2016_exampleSpotLine_withQuestionMark() {
+		LogParserTask task = new LogParserTask();
+		task.initHeader("2016-Apr-20 02:26  7.076 MHz  JT9");
+		Spot spot = task.parseDecodedSpot("0348 -14 -0.4 2814 @ QRZ? VK3AUQ");
+		
+		TestCase.assertNotNull(spot);
+		TestCase.assertEquals("0348", spot.getTime());
+		TestCase.assertEquals("-14", spot.getSignalreport());
+		TestCase.assertEquals("2814", spot.getFrequencyOffset());
+		TestCase.assertEquals("-0.4", spot.getTimeDeviation());
+		TestCase.assertEquals("QRZ?", spot.getWord1());
+		TestCase.assertEquals("VK3AUQ", spot.getWord2());
+		TestCase.assertEquals("", spot.getWord3());
+	}
+	
+	
+	/**
+	 * Tests log line from KP4MD 2016 ALL.TXT file: abbreviate exchange line: 
+	 * 
+	 * 2257 -11  0.6 2590 @ K6DIN -13 73
+	 */
+	@Test
+	public void testKP4MD_2016_exampleSpotLine_withAbbreviatedExchange() {
+		LogParserTask task = new LogParserTask();
+		task.initHeader("2016-Apr-20 02:26  7.076 MHz  JT9");
+		Spot spot = task.parseDecodedSpot("2257 -11  0.6 2590 @ K6DIN -13 73");
+		
+		TestCase.assertNotNull(spot);
+		TestCase.assertEquals("2257", spot.getTime());
+		TestCase.assertEquals("-11", spot.getSignalreport());
+		TestCase.assertEquals("2590", spot.getFrequencyOffset());
+		TestCase.assertEquals("0.6", spot.getTimeDeviation());
+		TestCase.assertEquals("K6DIN", spot.getWord1());
+		TestCase.assertEquals("-13", spot.getWord2());
+		TestCase.assertEquals("73", spot.getWord3());
 	}
 
 }
